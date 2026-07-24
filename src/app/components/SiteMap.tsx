@@ -13,6 +13,12 @@ export function SiteMap({ onNavigate, currentPage }: SiteMapProps) {
 
   const navLabelMap: Record<string, string> = {
     "dashboard": t.nav.dashboard,
+    "access-control": (t.nav as any).accessControl || "Access Control",
+    "teams": (t.nav as any).teams || "Teams",
+    "internal-users": (t.nav as any).internalUsers || "Internal Users",
+    "organizations": (t.nav as any).organizations || "Organizations",
+    "ai-gateway": (t.nav as any).aiGateway || "AI Gateway",
+    "virtual-key": (t.nav as any).virtualKey || "Virtual Key",
     "site-map": t.nav.siteMap,
     "hb-templates": t.nav.hbTemplates,
     "ui-kit": t.nav.uiKit,

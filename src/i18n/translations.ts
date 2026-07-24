@@ -14,6 +14,12 @@ export interface TranslationDict {
   };
   nav: {
     dashboard: string;
+    accessControl: string;
+    teams: string;
+    internalUsers: string;
+    organizations: string;
+    aiGateway: string;
+    virtualKey: string;
     hbTemplates: string;
     uiKit: string;
     samplePage: string;
@@ -74,6 +80,12 @@ export const translations: Record<Language, TranslationDict> = {
     },
     nav: {
       dashboard: "Dashboard",
+      accessControl: "Access Control",
+      teams: "Teams",
+      internalUsers: "Internal Users",
+      organizations: "Organizations",
+      aiGateway: "AI Gateway",
+      virtualKey: "Virtual Key",
       siteMap: "Site Map",
       hbTemplates: "HB Templates",
       uiKit: "UI Kit",
@@ -128,6 +140,12 @@ export const translations: Record<Language, TranslationDict> = {
     },
     nav: {
       dashboard: "Dashboard",
+      accessControl: "Zugriffskontrolle",
+      teams: "Teams",
+      internalUsers: "Interne Benutzer",
+      organizations: "Organisationen",
+      aiGateway: "KI-Gateway",
+      virtualKey: "Virtueller Schlüssel",
       siteMap: "Sitemap",
       hbTemplates: "HB-Vorlagen",
       uiKit: "UI-Kit",
@@ -182,6 +200,12 @@ export const translations: Record<Language, TranslationDict> = {
     },
     nav: {
       dashboard: "Tablero",
+      accessControl: "Control de Acceso",
+      teams: "Equipos",
+      internalUsers: "Usuarios Internos",
+      organizations: "Organizaciones",
+      aiGateway: "Pasarela IA",
+      virtualKey: "Clave Virtual",
       siteMap: "Mapa del Sitio",
       hbTemplates: "Plantillas HB",
       uiKit: "Kit de UI",

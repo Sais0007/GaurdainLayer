@@ -17,6 +17,9 @@ import LogsManagement from "./components/LogsManagement";
 import LogsPage from "./components/LogsPage";
 import { SiteMap } from "./components/SiteMap";
 import Dashboard from "./components/Dashboard";
+import Login from "./components/Login";
+import VirtualKeyManagement from "./components/VirtualKeyManagement";
+import TeamsManagement from "./components/TeamsManagement";
 import { FeedbackSystem } from "./components/FeedbackSystem";
 import { GlobalFooter } from "./components/GlobalFooter";
 import { LanguageProvider } from "../i18n/LanguageContext";
@@ -96,7 +99,7 @@ export default function App() {
   }, [menuOrientation]);
 
   const handleLogout = () => {
-    console.log("Logout clicked");
+    setCurrentPage("login");
   };
 
   const handleNavigate = (pageId: string) => {
@@ -113,101 +116,125 @@ export default function App() {
 
   return (
     <LanguageProvider>
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 transition-colors">
-      {/* Sidebar */}
-      <Sidebar
-        onLogout={handleLogout}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() =>
-          setIsSidebarCollapsed(!isSidebarCollapsed)
-        }
-        currentPage={currentPage}
-        onNavigate={handleNavigate}
-        logoUrl={logoUrl}
-        menuOrientation={menuOrientation}
-      />
+      {currentPage === "login" ? (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 transition-colors">
+          <Login
+            onNavigateToDashboard={() => setCurrentPage("dashboard")}
+            onLoginSuccess={(user) => {
+              console.log("Logged in successfully:", user);
+            }}
+          />
+          <Toaster
+            position="top-right"
+            expand
+            richColors
+            closeButton
+            theme={isDark ? "dark" : "light"}
+          />
+        </div>
+      ) : (
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 transition-colors">
+          {/* Sidebar */}
+          <Sidebar
+            onLogout={handleLogout}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() =>
+              setIsSidebarCollapsed(!isSidebarCollapsed)
+            }
+            currentPage={currentPage}
+            onNavigate={handleNavigate}
+            logoUrl={logoUrl}
+            menuOrientation={menuOrientation}
+          />
 
-      {/* Main Content */}
-      <main
-        className={`transition-all duration-300 ${
-          menuOrientation === "horizontal"
-            ? "ml-0"
-            : isSidebarCollapsed
-              ? "ml-16"
-              : "ml-64"
-        } pb-14`}
-      >
-        {/* Global Header */}
-        <GlobalHeader
-          isDarkMode={isDark}
-          onToggleDarkMode={() => setIsDark(!isDark)}
-          isSidebarCollapsed={isSidebarCollapsed}
-          currentTheme={currentTheme}
-          onThemeChange={setCurrentTheme}
-          logoUrl={logoUrl}
-          menuOrientation={menuOrientation}
-          onMenuOrientationChange={setMenuOrientation}
-          currentPage={currentPage}
-          onNavigate={handleNavigate}
-        />
+          {/* Main Content */}
+          <main
+            className={`transition-all duration-300 ${
+              menuOrientation === "horizontal"
+                ? "ml-0"
+                : isSidebarCollapsed
+                  ? "ml-16"
+                  : "ml-64"
+            } pb-14`}
+          >
+            {/* Global Header */}
+            <GlobalHeader
+              isDarkMode={isDark}
+              onToggleDarkMode={() => setIsDark(!isDark)}
+              isSidebarCollapsed={isSidebarCollapsed}
+              currentTheme={currentTheme}
+              onThemeChange={setCurrentTheme}
+              logoUrl={logoUrl}
+              menuOrientation={menuOrientation}
+              onMenuOrientationChange={setMenuOrientation}
+              currentPage={currentPage}
+              onNavigate={handleNavigate}
+            />
 
-        {/* Page Content */}
-        {currentPage === "ui-kit" ? (
-          <UIKit />
-        ) : currentPage === "sample-design" ? (
-          <SampleDesign />
-        ) : currentPage === "user-management" ? (
-          <UserManagement />
-        ) : currentPage === "event-management" ? (
-          <EventManagement />
-        ) : currentPage === "static-pages" ? (
-          <StaticPages />
-        ) : currentPage === "system-settings" ? (
-          <SystemSettings logoUrl={logoUrl} onLogoChange={setLogoUrl} />
-        ) : currentPage === "country" ? (
-          <MasterManagement masterType="country" />
-        ) : currentPage === "state" ? (
-          <MasterManagement masterType="state" />
-        ) : currentPage === "city" ? (
-          <MasterManagement masterType="city" />
-        ) : currentPage === "role-management" ? (
-          <RoleManagement />
-        ) : currentPage === "email-templates" ? (
-          <EmailTemplates />
-        ) : currentPage === "system-notifications" ? (
-          <SystemNotifications />
-        ) : currentPage === "logs" ? (
-          <LogsPage />
-        ) : currentPage === "site-map" ? (
-          <SiteMap onNavigate={handleNavigate} currentPage={currentPage} />
-        ) : currentPage === "dashboard" ? (
-          <Dashboard />
-        ) : (
-          <div className="p-6 text-neutral-500">
-            {currentPage === "company-profile" && "Company Profile Page"}
-            {currentPage !== "dashboard" && currentPage !== "company-profile" && "Select a module to preview UI components"}
-          </div>
-        )}
+            {/* Page Content */}
+            {currentPage === "ui-kit" ? (
+              <UIKit />
+            ) : currentPage === "sample-design" ? (
+              <SampleDesign />
+            ) : currentPage === "ai-teams" || currentPage === "teams" ? (
+              <TeamsManagement />
+            ) : currentPage === "internal-users" || currentPage === "user-management" ? (
+              <UserManagement />
+            ) : currentPage === "organizations" ? (
+              <MasterManagement masterType="country" />
+            ) : currentPage === "virtual-key" ? (
+              <VirtualKeyManagement />
+            ) : currentPage === "event-management" ? (
+              <EventManagement />
+            ) : currentPage === "static-pages" ? (
+              <StaticPages />
+            ) : currentPage === "system-settings" ? (
+              <SystemSettings logoUrl={logoUrl} onLogoChange={setLogoUrl} />
+            ) : currentPage === "country" ? (
+              <MasterManagement masterType="country" />
+            ) : currentPage === "state" ? (
+              <MasterManagement masterType="state" />
+            ) : currentPage === "city" ? (
+              <MasterManagement masterType="city" />
+            ) : currentPage === "role-management" ? (
+              <RoleManagement />
+            ) : currentPage === "email-templates" ? (
+              <EmailTemplates />
+            ) : currentPage === "system-notifications" ? (
+              <SystemNotifications />
+            ) : currentPage === "logs" ? (
+              <LogsPage />
+            ) : currentPage === "site-map" ? (
+              <SiteMap onNavigate={handleNavigate} currentPage={currentPage} />
+            ) : currentPage === "dashboard" ? (
+              <Dashboard />
+            ) : (
+              <div className="p-6 text-neutral-500">
+                {currentPage === "company-profile" && "Company Profile Page"}
+                {currentPage !== "dashboard" && currentPage !== "company-profile" && "Select a module to preview UI components"}
+              </div>
+            )}
 
-        {/* Global Footer */}
-        <GlobalFooter 
-          isSidebarCollapsed={isSidebarCollapsed} 
-          menuOrientation={menuOrientation} 
-        />
-      </main>
+            {/* Global Footer */}
+            <GlobalFooter 
+              isSidebarCollapsed={isSidebarCollapsed} 
+              menuOrientation={menuOrientation} 
+            />
+          </main>
 
-      {/* Global Feedback System */}
-      <FeedbackSystem />
+          {/* Global Feedback System */}
+          <FeedbackSystem />
 
-      {/* Toast */}
-      <Toaster
-        position="top-right"
-        expand
-        richColors
-        closeButton
-        theme={isDark ? "dark" : "light"}
-      />
-    </div>
+          {/* Toast */}
+          <Toaster
+            position="top-right"
+            expand
+            richColors
+            closeButton
+            theme={isDark ? "dark" : "light"}
+          />
+        </div>
+      )}
     </LanguageProvider>
   );
 }

@@ -9,6 +9,9 @@ import {
   Layers,
   Calendar,
   Map,
+  LogIn,
+  ShieldCheck,
+  Cpu,
 } from "lucide-react";
 
 export interface SubMenuItem {
@@ -40,6 +43,44 @@ export const getNavigationData = (
       active: currentPage === "dashboard",
     },
     {
+      id: "access-control",
+      label: "Access Control",
+      icon: ShieldCheck,
+      subItems: [
+        {
+          id: "teams",
+          label: "Teams",
+          onClick: () => onNavigate("teams"),
+          active: currentPage === "teams",
+        },
+        {
+          id: "internal-users",
+          label: "Internal Users",
+          onClick: () => onNavigate("internal-users"),
+          active: currentPage === "internal-users",
+        },
+        {
+          id: "organizations",
+          label: "Organizations",
+          onClick: () => onNavigate("organizations"),
+          active: currentPage === "organizations",
+        },
+      ],
+    },
+    {
+      id: "ai-gateway",
+      label: "AI Gateway",
+      icon: Cpu,
+      subItems: [
+        {
+          id: "virtual-key",
+          label: "Virtual Key",
+          onClick: () => onNavigate("virtual-key"),
+          active: currentPage === "virtual-key",
+        },
+      ],
+    },
+    {
       id: "site-map",
       label: "Site Map",
       icon: Map,
@@ -64,101 +105,6 @@ export const getNavigationData = (
           active: currentPage === "sample-design",
         },
       ],
-    },
-    {
-      id: "user-management-group",
-      label: "User Management",
-      icon: Users,
-      subItems: [
-        {
-          id: "user-management",
-          label: "Users",
-          onClick: () => onNavigate("user-management"),
-          active: currentPage === "user-management",
-        },
-        {
-          id: "role-management",
-          label: "Roles",
-          onClick: () => onNavigate("role-management"),
-          active: currentPage === "role-management",
-        },
-      ],
-    },
-    {
-      id: "event-management-group",
-      label: "Event Management",
-      icon: Calendar,
-      subItems: [
-        {
-          id: "event-management",
-          label: "Events",
-          onClick: () => onNavigate("event-management"),
-          active: currentPage === "event-management",
-        },
-      ],
-    },
-    {
-      id: "organisational-master",
-      label: "Master Managment",
-      icon: Layers,
-      subItems: [
-        {
-          id: "country",
-          label: "Country",
-          onClick: () => onNavigate("country"),
-          active: currentPage === "country",
-        },
-        {
-          id: "state",
-          label: "State",
-          onClick: () => onNavigate("state"),
-          active: currentPage === "state",
-        },
-        {
-          id: "city",
-          label: "City",
-          onClick: () => onNavigate("city"),
-          active: currentPage === "city",
-        },
-      ],
-    },
-    {
-      id: "configurations-group",
-      label: "Configurations",
-      icon: Palette,
-      subItems: [
-        {
-          id: "static-pages",
-          label: "Static Pages",
-          onClick: () => onNavigate("static-pages"),
-          active: currentPage === "static-pages",
-        },
-        {
-          id: "email-templates",
-          label: "Email Templates",
-          onClick: () => onNavigate("email-templates"),
-          active: currentPage === "email-templates",
-        },
-        {
-          id: "system-notifications",
-          label: "System Notifications",
-          onClick: () => onNavigate("system-notifications"),
-          active: currentPage === "system-notifications",
-        },
-        {
-          id: "system-settings",
-          label: "System Settings",
-          onClick: () => onNavigate("system-settings"),
-          active: currentPage === "system-settings",
-        },
-      ],
-    },
-    {
-      id: "logs-group",
-      label: "Logs",
-      icon: FileText,
-      onClick: () => onNavigate("logs"),
-      active: currentPage === "logs",
     },
   ];
 };
