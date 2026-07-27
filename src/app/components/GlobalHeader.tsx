@@ -121,7 +121,7 @@ export function GlobalHeader({
   const [recentSearches, setRecentSearches] = useState<
     string[]
   >(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       const saved = localStorage.getItem("recentSearches");
       return saved ? JSON.parse(saved) : [];
     }
@@ -613,10 +613,12 @@ export function GlobalHeader({
         ...recentSearches.filter((s) => s !== query),
       ].slice(0, 5);
       setRecentSearches(newRecent);
-      localStorage.setItem(
-        "recentSearches",
-        JSON.stringify(newRecent),
-      );
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(
+          "recentSearches",
+          JSON.stringify(newRecent),
+        );
+      }
       setShowSearchDropdown(false);
     }
   };
@@ -624,7 +626,9 @@ export function GlobalHeader({
   // Clear recent searches
   const handleClearRecent = () => {
     setRecentSearches([]);
-    localStorage.removeItem("recentSearches");
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("recentSearches");
+    }
   };
 
   // Remove single recent search
@@ -637,10 +641,12 @@ export function GlobalHeader({
       (s) => s !== searchToRemove,
     );
     setRecentSearches(newRecent);
-    localStorage.setItem(
-      "recentSearches",
-      JSON.stringify(newRecent),
-    );
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(
+        "recentSearches",
+        JSON.stringify(newRecent),
+      );
+    }
   };
 
   // Detect scroll

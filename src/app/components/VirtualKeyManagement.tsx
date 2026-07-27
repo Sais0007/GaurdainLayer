@@ -34,6 +34,7 @@ import {
   ArrowDown,
   EyeOff,
   ChevronDown,
+  ChevronUp,
   Lock,
   Globe,
   Tag,
@@ -86,6 +87,33 @@ export interface VirtualKey {
   description?: string;
   secretKeyMasked: string;
 }
+
+// Dropdown Option Constants
+const AVAILABLE_OWNERS = [
+  "hbadmin@yopmail.com",
+  "superadmin@spinecloudiq.com",
+  "alex.dev@hb.com",
+  "sarah.connor@hb.com",
+  "michael.scott@hb.com",
+];
+
+const AVAILABLE_TEAMS = [
+  { name: "AI Research", org: "HB Enterprise", defaultPolicies: ["Rate Limiting", "IP Whitelist"] },
+  { name: "DevOps Core", org: "Spine CloudIQ", defaultPolicies: ["Cost Guard", "Geo Fence"] },
+  { name: "SecOps Team", org: "CyberShield Ltd", defaultPolicies: ["Rate Limiting", "PII Masking"] },
+  { name: "QA Testing", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
+  { name: "Frontend Platform", org: "HB Enterprise", defaultPolicies: ["Rate Limiting", "Caching"] },
+  { name: "Data Science", org: "Spine CloudIQ", defaultPolicies: ["Cost Guard", "Rate Limiting"] },
+];
+
+const AVAILABLE_MODELS = [
+  { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", badge: "Flagship" },
+  { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic", badge: "Reasoning" },
+  { id: "gemini-1-5-pro", name: "Gemini 1.5 Pro", provider: "Google", badge: "Multimodal" },
+  { id: "llama-3-70b", name: "Llama 3 70B", provider: "Meta", badge: "Open Source" },
+  { id: "codex-mini-latest", name: "Codex", provider: "OpenAI", badge: "Code" },
+  { id: "mistral-large", name: "Mistral Large", provider: "Mistral", badge: "Fast" },
+];
 
 // Initial Mock Keys
 const mockVirtualKeys: VirtualKey[] = [
@@ -315,27 +343,55 @@ export default function VirtualKeyManagement() {
   const [showResetSpendModal, setShowResetSpendModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Wizard Form State
-  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  // Highlighted key ID after creation
+  const [highlightedKeyId, setHighlightedKeyId] = useState<string | null>(null);
+
+  // Form State
+  const [formOwner, setFormOwner] = useState("hbadmin@yopmail.com");
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
+
+  const [teamSearch, setTeamSearch] = useState("");
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
+
   const [formOwnerType, setFormOwnerType] = useState<"You" | "Another User">("You");
   const [formOrg, setFormOrg] = useState("HB Enterprise");
   const [formTeam, setFormTeam] = useState("AI Research");
   const [formAlias, setFormAlias] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formModels, setFormModels] = useState<string[]>(["gpt-4o"]);
+  const [formModels, setFormModels] = useState<string[]>(["gpt-4o", "claude-3-5-sonnet"]);
   const [allModelsSelected, setAllModelsSelected] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [formKeyType, setFormKeyType] = useState<"AI APIs" | "Management" | "Full Access">("AI APIs");
   const [formMaxBudget, setFormMaxBudget] = useState("500");
+  const [formSoftBudget, setFormSoftBudget] = useState("400");
+  const [formBudgetCycle, setFormBudgetCycle] = useState("Monthly");
   const [formTpmLimit, setFormTpmLimit] = useState("100000");
   const [formRpmLimit, setFormRpmLimit] = useState("1000");
+  const [formModelSpecificLimits, setFormModelSpecificLimits] = useState("");
   const [formExpiryDuration, setFormExpiryDuration] = useState("Never");
   const [formGracePeriod, setFormGracePeriod] = useState("7 Days");
-  const [formPolicies, setFormPolicies] = useState<string[]>(["Rate Limiting"]);
+  const [formPolicies, setFormPolicies] = useState<string[]>(["Rate Limiting", "IP Whitelist"]);
   const [formGuardrails, setFormGuardrails] = useState<string[]>(["PII Masking"]);
   const [formLogging, setFormLogging] = useState("Splunk Enterprise");
   const [formAutoRotation, setFormAutoRotation] = useState(true);
   const [formCallbackUrl, setFormCallbackUrl] = useState("https://api.company.com/webhooks/ai-audit");
+
+  const [formCapabilities, setFormCapabilities] = useState({
+    apiAccess: true,
+    modelAccess: true,
+    spendTracking: true,
+    logging: true,
+    teamResources: false,
+  });
+
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [formTags, setFormTags] = useState("env:production, gateway:v1");
+  const [formAllowedIps, setFormAllowedIps] = useState("");
+  const [formNotes, setFormNotes] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [formTouched, setFormTouched] = useState(false);
 
   // Detail View Tab
   const [detailTab, setDetailTab] = useState<"overview" | "configuration" | "usage" | "policies" | "logs">("overview");
@@ -356,126 +412,122 @@ export default function VirtualKeyManagement() {
   // Close active dropdowns outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest(".action-menu-container")) {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".action-menu-container")) {
         setActiveMenuId(null);
         setShowHeaderActionsMenu(false);
       }
-      if (!(e.target as HTMLElement).closest(".model-dropdown-container")) {
+      if (!target.closest(".model-dropdown-container")) {
         setShowModelDropdown(false);
+      }
+      if (!target.closest(".owner-dropdown-container")) {
+        setShowOwnerDropdown(false);
+      }
+      if (!target.closest(".team-dropdown-container")) {
+        setShowTeamDropdown(false);
       }
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // Filtered and Sorted keys
-  const filteredKeys = useMemo(() => {
-    let result = keys.filter((item) => {
-      const matchesSearch = 
-        !searchQuery ||
-        item.alias.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.keyId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.organization.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.team.toLowerCase().includes(searchQuery.toLowerCase());
+  // Reset view state to listing when navigating via global menu
+  useEffect(() => {
+    const handleReset = () => {
+      setViewState("list");
+      setSelectedKey(null);
+    };
+    window.addEventListener("reset-view-state", handleReset);
+    return () => window.removeEventListener("reset-view-state", handleReset);
+  }, []);
 
-      const matchesStatus = filterStatus === "All" || item.status === filterStatus;
-      const matchesOwner = filterOwner === "All" || item.owner === filterOwner || (filterOwner === "You" && item.ownerType === "You");
-      const matchesOrg = filterOrg === "All" || item.organization === filterOrg;
-      const matchesTeam = filterTeam === "All" || item.team === filterTeam;
-      const matchesType = filterType === "All" || item.keyType === filterType;
-      const matchesModel = filterModel === "All" || item.models.includes("All Models") || item.models.includes(filterModel);
+  // Validation calculations
+  const isDuplicateName = useMemo(() => {
+    if (!formAlias.trim()) return false;
+    return keys.some(
+      (k) =>
+        k.alias.toLowerCase().trim() === formAlias.toLowerCase().trim() &&
+        (!isEditMode || k.id !== selectedKey?.id)
+    );
+  }, [formAlias, keys, isEditMode, selectedKey]);
 
-      return matchesSearch && matchesStatus && matchesOwner && matchesOrg && matchesTeam && matchesType && matchesModel;
-    });
+  const isBudgetInvalid = useMemo(() => {
+    if (formMaxBudget === "") return false;
+    const num = Number(formMaxBudget);
+    return isNaN(num) || num < 0;
+  }, [formMaxBudget]);
 
-    result.sort((a, b) => {
-      let valA: any = a[sortField];
-      let valB: any = b[sortField];
+  const isSoftBudgetInvalid = useMemo(() => {
+    if (formSoftBudget === "") return false;
+    const num = Number(formSoftBudget);
+    const maxNum = Number(formMaxBudget);
+    return isNaN(num) || num < 0 || (!isNaN(maxNum) && maxNum > 0 && num > maxNum);
+  }, [formSoftBudget, formMaxBudget]);
 
-      if (typeof valA === "string") {
-        valA = valA.toLowerCase();
-        valB = valB.toLowerCase();
-      }
+  const isTpmInvalid = useMemo(() => {
+    if (formTpmLimit === "") return false;
+    const num = Number(formTpmLimit);
+    return isNaN(num) || num < 0;
+  }, [formTpmLimit]);
 
-      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
-      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
+  const isRpmInvalid = useMemo(() => {
+    if (formRpmLimit === "") return false;
+    const num = Number(formRpmLimit);
+    return isNaN(num) || num < 0;
+  }, [formRpmLimit]);
 
-    return result;
-  }, [keys, searchQuery, filterStatus, filterOwner, filterOrg, filterTeam, filterType, filterModel, sortField, sortDirection]);
-
-  // Paginated keys
-  const paginatedKeys = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredKeys.slice(start, start + pageSize);
-  }, [filteredKeys, currentPage, pageSize]);
-
-  const handleSort = (field: keyof VirtualKey) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const renderSortIndicator = (field: keyof VirtualKey) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
-    }
-    return sortDirection === "asc" 
-      ? <ArrowUp className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
-      : <ArrowDown className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />;
-  };
-
-  // KPI Stats
-  const kpiStats = useMemo(() => {
-    const total = keys.length;
-    const active = keys.filter((k) => k.status === "Active").length;
-    const nearLimit = keys.filter((k) => k.status === "Near Limit").length;
-    const blocked = keys.filter((k) => k.status === "Blocked").length;
-    const expired = keys.filter((k) => k.status === "Expired").length;
-    return [
-      { id: "total", label: "Total Virtual Keys", value: total, subValue: "All provisioned keys", color: "blue" },
-      { id: "active", label: "Active Keys", value: active, subValue: "Ready for proxy requests", color: "green" },
-      { id: "nearLimit", label: "Near Limit", value: nearLimit, subValue: "Budget / TPM warning", color: "orange" },
-      { id: "blocked", label: "Blocked Keys", value: blocked, subValue: "Access restricted", color: "red" },
-      { id: "expired", label: "Expired Keys", value: expired, subValue: "Validity lapsed", color: "gray" },
-    ];
-  }, [keys]);
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(new Set(paginatedKeys.map((k) => k.id)));
-    else setSelectedIds(new Set());
-  };
-
-  const handleSelectOne = (id: string, checked: boolean) => {
-    const next = new Set(selectedIds);
-    if (checked) next.add(id);
-    else next.delete(id);
-    setSelectedIds(next);
-  };
+  const isFormValid = useMemo(() => {
+    return (
+      formAlias.trim().length > 0 &&
+      formAlias.length <= 100 &&
+      !isDuplicateName &&
+      !isBudgetInvalid &&
+      !isSoftBudgetInvalid &&
+      !isTpmInvalid &&
+      !isRpmInvalid
+    );
+  }, [formAlias, isDuplicateName, isBudgetInvalid, isSoftBudgetInvalid, isTpmInvalid, isRpmInvalid]);
 
   const handleOpenCreateModal = () => {
     setIsEditMode(false);
-    setWizardStep(1);
+    setSelectedKey(null);
     setFormAlias("");
     setFormDescription("");
-    setFormModels(["gpt-4o"]);
+    setFormOwner("hbadmin@yopmail.com");
+    setFormTeam("AI Research");
+    setFormOrg("HB Enterprise");
+    setFormKeyType("AI APIs");
+    setFormModels(["gpt-4o", "claude-3-5-sonnet"]);
     setAllModelsSelected(false);
     setFormMaxBudget("500");
-    setFormKeyType("AI APIs");
+    setFormSoftBudget("400");
+    setFormBudgetCycle("Monthly");
+    setFormTpmLimit("100000");
+    setFormRpmLimit("1000");
+    setFormModelSpecificLimits("");
+    setFormCapabilities({
+      apiAccess: true,
+      modelAccess: true,
+      spendTracking: true,
+      logging: true,
+      teamResources: false,
+    });
+    setShowAdvancedSettings(false);
+    setFormTags("env:production, gateway:v1");
+    setFormExpiryDuration("Never");
+    setFormAllowedIps("");
+    setFormNotes("");
+    setFormTouched(false);
+    setIsGenerating(false);
     setShowCreateModal(true);
   };
 
   const handleOpenEditModal = (keyItem: VirtualKey) => {
     setSelectedKey(keyItem);
     setIsEditMode(true);
-    setWizardStep(1);
     setFormAlias(keyItem.alias);
     setFormDescription(keyItem.description || "");
+    setFormOwner(keyItem.owner || "hbadmin@yopmail.com");
     setFormOwnerType(keyItem.ownerType);
     setFormOrg(keyItem.organization);
     setFormTeam(keyItem.team);
@@ -483,8 +535,18 @@ export default function VirtualKeyManagement() {
     setFormModels(keyItem.models);
     setAllModelsSelected(keyItem.models.includes("All Models"));
     setFormMaxBudget(keyItem.maxBudget.toString());
+    setFormSoftBudget((keyItem.maxBudget * 0.8).toString());
+    setFormBudgetCycle("Monthly");
     setFormTpmLimit(keyItem.tpmLimit.toString());
     setFormRpmLimit(keyItem.rpmLimit.toString());
+    setFormModelSpecificLimits("");
+    setFormCapabilities({
+      apiAccess: true,
+      modelAccess: true,
+      spendTracking: true,
+      logging: true,
+      teamResources: true,
+    });
     setFormExpiryDuration(keyItem.expiryDuration);
     setFormGracePeriod(keyItem.gracePeriod);
     setFormPolicies(keyItem.policies);
@@ -492,79 +554,113 @@ export default function VirtualKeyManagement() {
     setFormLogging(keyItem.loggingIntegration);
     setFormAutoRotation(keyItem.autoRotation);
     setFormCallbackUrl(keyItem.callbackUrl || "");
+    setShowAdvancedSettings(false);
+    setFormTags("env:production");
+    setFormAllowedIps("");
+    setFormNotes("");
+    setFormTouched(false);
+    setIsGenerating(false);
     setShowCreateModal(true);
   };
 
+  const handleSelectTeam = (teamName: string) => {
+    setFormTeam(teamName);
+    const foundTeam = AVAILABLE_TEAMS.find((t) => t.name === teamName);
+    if (foundTeam) {
+      setFormOrg(foundTeam.org);
+      setFormPolicies(foundTeam.defaultPolicies);
+    }
+  };
+
   const handleSaveVirtualKey = () => {
-    if (!formAlias.trim()) {
-      toast.error("Please enter a Virtual Key Name");
+    setFormTouched(true);
+
+    if (!isFormValid) {
+      if (isDuplicateName) {
+        toast.error("A Virtual Key with this name already exists.");
+      } else {
+        toast.error("Please resolve all validation errors before proceeding.");
+      }
       return;
     }
 
-    if (isEditMode && selectedKey) {
-      setKeys((prev) =>
-        prev.map((k) =>
-          k.id === selectedKey.id
-            ? {
-                ...k,
-                alias: formAlias,
-                description: formDescription,
-                organization: formOrg,
-                team: formTeam,
-                keyType: formKeyType,
-                models: allModelsSelected ? ["All Models"] : formModels,
-                maxBudget: parseFloat(formMaxBudget) || 0,
-                tpmLimit: parseInt(formTpmLimit) || 100000,
-                rpmLimit: parseInt(formRpmLimit) || 1000,
-                expiryDuration: formExpiryDuration,
-                gracePeriod: formGracePeriod,
-                policies: formPolicies,
-                guardrails: formGuardrails,
-                loggingIntegration: formLogging,
-                autoRotation: formAutoRotation,
-                callbackUrl: formCallbackUrl,
-              }
-            : k
-        )
-      );
-      toast.success(`Virtual key "${formAlias}" updated successfully!`);
-    } else {
-      const newKeyItem: VirtualKey = {
-        id: `vk-${Date.now()}`,
-        keyId: `${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
-        secretKeyMasked: "sk-litellm-" + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("") + "••••••••••••••••",
-        alias: formAlias,
-        owner: formOwnerType === "You" ? "hbadmin@yopmail.com" : "superadmin@spinecloudiq.com",
-        ownerId: "usr-904128",
-        ownerType: formOwnerType,
-        organization: formOrg,
-        orgId: "org-57c860ac",
-        team: formTeam,
-        keyType: formKeyType,
-        models: allModelsSelected ? ["All Models"] : formModels,
-        maxBudget: parseFloat(formMaxBudget) || 500,
-        currentSpend: 0,
-        status: "Active",
-        tpmLimit: parseInt(formTpmLimit) || 100000,
-        rpmLimit: parseInt(formRpmLimit) || 1000,
-        expiryDuration: formExpiryDuration,
-        expiryDate: formExpiryDuration === "Never" ? "Never" : "Oct 24, 2026",
-        gracePeriod: formGracePeriod,
-        policies: formPolicies,
-        guardrails: formGuardrails,
-        loggingIntegration: formLogging,
-        autoRotation: formAutoRotation,
-        callbackUrl: formCallbackUrl,
-        lastUsed: "Just now",
-        createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        createdBy: "hbadmin@yopmail.com",
-        description: formDescription,
-      };
-      setKeys((prev) => [newKeyItem, ...prev]);
-      toast.success(`Virtual key "${formAlias}" created successfully!`);
-    }
+    setIsGenerating(true);
 
-    setShowCreateModal(false);
+    setTimeout(() => {
+      if (isEditMode && selectedKey) {
+        setKeys((prev) =>
+          prev.map((k) =>
+            k.id === selectedKey.id
+              ? {
+                  ...k,
+                  alias: formAlias.trim(),
+                  description: formDescription.trim(),
+                  owner: formOwner,
+                  organization: formOrg,
+                  team: formTeam,
+                  keyType: formKeyType,
+                  models: allModelsSelected ? ["All Models"] : (formModels.length > 0 ? formModels : ["gpt-4o"]),
+                  maxBudget: parseFloat(formMaxBudget) || 0,
+                  tpmLimit: parseInt(formTpmLimit) || 100000,
+                  rpmLimit: parseInt(formRpmLimit) || 1000,
+                  expiryDuration: formExpiryDuration,
+                  gracePeriod: formGracePeriod,
+                  policies: formPolicies,
+                  guardrails: formGuardrails,
+                  loggingIntegration: formLogging,
+                  autoRotation: formAutoRotation,
+                  callbackUrl: formCallbackUrl,
+                }
+              : k
+          )
+        );
+        toast.success(`Virtual Key "${formAlias.trim()}" updated successfully!`);
+        setHighlightedKeyId(selectedKey.id);
+      } else {
+        const newId = `vk-${Date.now()}`;
+        const newKeyItem: VirtualKey = {
+          id: newId,
+          keyId: `${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+          secretKeyMasked: "sk-litellm-" + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("") + "••••••••••••••••",
+          alias: formAlias.trim(),
+          owner: formOwner,
+          ownerId: "usr-904128",
+          ownerType: formOwner === "hbadmin@yopmail.com" ? "You" : "Another User",
+          organization: formOrg,
+          orgId: "org-57c860ac",
+          team: formTeam,
+          keyType: formKeyType,
+          models: allModelsSelected ? ["All Models"] : (formModels.length > 0 ? formModels : ["gpt-4o"]),
+          maxBudget: parseFloat(formMaxBudget) || 500,
+          currentSpend: 0,
+          status: "Active",
+          tpmLimit: parseInt(formTpmLimit) || 100000,
+          rpmLimit: parseInt(formRpmLimit) || 1000,
+          expiryDuration: formExpiryDuration,
+          expiryDate: formExpiryDuration === "Never" ? "Never" : "Oct 24, 2026",
+          gracePeriod: "7 Days",
+          policies: formPolicies.length > 0 ? formPolicies : ["Rate Limiting"],
+          guardrails: ["PII Masking"],
+          loggingIntegration: "Splunk Enterprise",
+          autoRotation: true,
+          callbackUrl: "https://api.company.com/webhooks/ai-audit",
+          lastUsed: "Just now",
+          createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+          createdBy: formOwner,
+          description: formDescription.trim(),
+        };
+        setKeys((prev) => [newKeyItem, ...prev]);
+        toast.success(`Virtual Key "${formAlias.trim()}" generated successfully!`);
+        setHighlightedKeyId(newId);
+      }
+
+      setIsGenerating(false);
+      setShowCreateModal(false);
+
+      setTimeout(() => {
+        setHighlightedKeyId(null);
+      }, 4000);
+    }, 600);
   };
 
   const handleRegenerateKeySubmit = () => {
@@ -639,6 +735,166 @@ export default function VirtualKeyManagement() {
     "mistral-large"
   ];
 
+  // Dynamic KPI Summary Stats
+  const kpiStats = useMemo(() => {
+    const totalKeys = keys.length;
+    const activeKeys = keys.filter((k) => k.status === "Active").length;
+    const nearLimitKeys = keys.filter((k) => k.status === "Near Limit").length;
+    const totalSpend = keys.reduce((sum, k) => sum + k.currentSpend, 0);
+    const blockedKeys = keys.filter((k) => k.status === "Blocked" || k.status === "Expired").length;
+
+    return [
+      {
+        id: "total-keys",
+        label: "Total Virtual Keys",
+        value: totalKeys.toString(),
+        subValue: `${activeKeys} Active in Production`,
+      },
+      {
+        id: "active-keys",
+        label: "Active Keys",
+        value: activeKeys.toString(),
+        subValue: `${((activeKeys / (totalKeys || 1)) * 100).toFixed(0)}% Operational`,
+      },
+      {
+        id: "total-spend",
+        label: "Accumulated Spend",
+        value: `$${totalSpend.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        subValue: "Current Billing Cycle",
+      },
+      {
+        id: "near-limit",
+        label: "Near Limit Alerts",
+        value: nearLimitKeys.toString(),
+        subValue: nearLimitKeys > 0 ? "Requires Budget Attention" : "All Within Thresholds",
+      },
+      {
+        id: "blocked-keys",
+        label: "Blocked / Expired",
+        value: blockedKeys.toString(),
+        subValue: "Access Suspended",
+      },
+    ];
+  }, [keys]);
+
+  // 1. Filtered Virtual Keys
+  const filteredKeys = useMemo(() => {
+    return keys.filter((key) => {
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !query ||
+        key.alias.toLowerCase().includes(query) ||
+        key.keyId.toLowerCase().includes(query) ||
+        key.owner.toLowerCase().includes(query) ||
+        key.team.toLowerCase().includes(query) ||
+        key.organization.toLowerCase().includes(query) ||
+        (key.description && key.description.toLowerCase().includes(query)) ||
+        key.models.some((m) => m.toLowerCase().includes(query));
+
+      const matchesStatus = filterStatus === "All" || key.status === filterStatus;
+      const matchesOwner = filterOwner === "All" || key.owner === filterOwner;
+      const matchesOrg = filterOrg === "All" || key.organization === filterOrg;
+      const matchesTeam = filterTeam === "All" || key.team === filterTeam;
+      const matchesType = filterType === "All" || key.keyType === filterType;
+      const matchesModel =
+        filterModel === "All" ||
+        key.models.includes("All Models") ||
+        key.models.includes(filterModel);
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesOwner &&
+        matchesOrg &&
+        matchesTeam &&
+        matchesType &&
+        matchesModel
+      );
+    });
+  }, [
+    keys,
+    searchQuery,
+    filterStatus,
+    filterOwner,
+    filterOrg,
+    filterTeam,
+    filterType,
+    filterModel,
+  ]);
+
+  // 2. Sorted Virtual Keys
+  const sortedKeys = useMemo(() => {
+    return [...filteredKeys].sort((a, b) => {
+      let aVal: any = a[sortField];
+      let bVal: any = b[sortField];
+
+      if (typeof aVal === "string") {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal || "").toLowerCase();
+      }
+
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredKeys, sortField, sortDirection]);
+
+  // 3. Paginated Virtual Keys
+  const paginatedKeys = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedKeys.slice(start, start + pageSize);
+  }, [sortedKeys, currentPage, pageSize]);
+
+  // Sorting Table Helper
+  const handleSort = (field: keyof VirtualKey) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortIndicator = (field: keyof VirtualKey) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400 font-bold" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400 font-bold" />
+    );
+  };
+
+  // Checkbox Selection Helpers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(paginatedKeys.map((k) => k.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const next = new Set(selectedIds);
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleResetFilters = () => {
+    setFilterStatus("All");
+    setFilterOwner("All");
+    setFilterOrg("All");
+    setFilterTeam("All");
+    setFilterType("All");
+    setFilterModel("All");
+    setSearchQuery("");
+  };
+
   // Filtered audit logs
   const filteredAuditLogs = useMemo(() => {
     return mockAuditLogs.filter((log) => {
@@ -654,15 +910,11 @@ export default function VirtualKeyManagement() {
       {/* ========================================================================= */}
       {/* SCREEN 1: VIRTUAL KEY LISTING (TABLE VIEW ONLY)                           */}
       {/* ========================================================================= */}
-      {viewState === "list" ? (
+      {viewState === "list" || !selectedKey ? (
         <>
           <PageHeader
-            title="Virtual Keys"
-            breadcrumbs={[
-              { label: "Site Map", href: "#" },
-              { label: "AI Gateway", href: "#" },
-              { label: "Virtual Keys", current: true },
-            ]}
+            pageId="virtual-key"
+            action="list"
           >
             {/* 1. Search Bar */}
             <SearchBar
@@ -887,11 +1139,17 @@ export default function VirtualKeyManagement() {
                       const isSelected = selectedIds.has(item.id);
                       const isMenuOpen = activeMenuId === item.id;
 
+                      const isHighlighted = item.id === highlightedKeyId;
+
                       return (
                         <tr
                           key={item.id}
-                          className={`hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40 transition-colors ${
-                            isSelected ? "bg-primary-50/40 dark:bg-primary-950/20" : ""
+                          className={`hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40 transition-all duration-500 ${
+                            isHighlighted
+                              ? "bg-primary-50/80 dark:bg-primary-950/60 ring-2 ring-primary-500/60 shadow-xs"
+                              : isSelected
+                              ? "bg-primary-50/40 dark:bg-primary-950/20"
+                              : ""
                           }`}
                         >
                           <td className="py-3.5 px-4">
@@ -1203,12 +1461,14 @@ export default function VirtualKeyManagement() {
                     </h2>
                     {renderStatusBadge(selectedKey.status)}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
-                    <span>Key ID: {selectedKey.keyId}</span>
+                  <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono min-w-0">
+                    <span className="truncate max-w-[280px] sm:max-w-[420px]" title={selectedKey.keyId}>
+                      Key ID: {selectedKey.keyId.length > 32 ? `${selectedKey.keyId.substring(0, 24)}...` : selectedKey.keyId}
+                    </span>
                     <button
                       type="button"
                       onClick={() => handleCopyText(selectedKey.keyId, "Copied successfully!")}
-                      className="text-neutral-400 hover:text-primary-600 transition-colors p-1"
+                      className="text-neutral-400 hover:text-primary-600 transition-colors p-1 shrink-0"
                       title="Copy Key ID"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -1230,45 +1490,45 @@ export default function VirtualKeyManagement() {
               </div>
 
               {/* Comprehensive Metadata Header Summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-xs">
-                <div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
+                <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Owner</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
-                    <span>{selectedKey.owner}</span>
-                    <button type="button" onClick={() => handleCopyText(selectedKey.ownerId, "Copied successfully!")} title="Copy Owner ID">
-                      <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600" />
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 min-w-0">
+                    <span className="truncate" title={selectedKey.owner}>{selectedKey.owner}</span>
+                    <button type="button" onClick={() => handleCopyText(selectedKey.ownerId, "Copied successfully!")} title="Copy Owner ID" className="shrink-0 p-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded">
+                      <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600 transition-colors" />
                     </button>
                   </div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Organization</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
-                    <span>{selectedKey.organization}</span>
-                    <button type="button" onClick={() => handleCopyText(selectedKey.orgId, "Copied successfully!")} title="Copy Org ID">
-                      <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600" />
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 min-w-0">
+                    <span className="truncate" title={selectedKey.organization}>{selectedKey.organization}</span>
+                    <button type="button" onClick={() => handleCopyText(selectedKey.orgId, "Copied successfully!")} title="Copy Org ID" className="shrink-0 p-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded">
+                      <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600 transition-colors" />
                     </button>
                   </div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Team</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedKey.team}</div>
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate" title={selectedKey.team}>{selectedKey.team}</div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Created By</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedKey.createdBy}</div>
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate" title={selectedKey.createdBy}>{selectedKey.createdBy}</div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Created Date</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedKey.createdDate}</div>
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{selectedKey.createdDate}</div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Last Activity</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedKey.lastUsed}</div>
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{selectedKey.lastUsed}</div>
                 </div>
               </div>
             </div>
@@ -1721,37 +1981,730 @@ export default function VirtualKeyManagement() {
 
       {/* Modals & Dialogs Remain Active */}
       {/* ... Create/Edit, Regenerate, Filter, Block, Reset Spend, Delete Modals ... */}
+      {/* Restore Enterprise Create Virtual Key Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-primary-600" />
-                {isEditMode ? "Edit Virtual Key" : "Create Virtual Key"}
-              </h3>
-              <button onClick={() => setShowCreateModal(false)}>
-                <X className="w-4 h-4 text-neutral-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden my-auto">
+            {/* Modal Sticky Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200/60 dark:border-primary-800/60 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    {isEditMode ? "Edit Virtual Key" : "Create Virtual Key"}
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300">
+                      Enterprise Config
+                    </span>
+                  </h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    Create and configure a Virtual Key for secure AI Gateway access.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                title="Close Modal"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-            {/* Form step 1 & 2 content... */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold mb-1">Virtual Key Name *</label>
-                <input
-                  type="text"
-                  value={formAlias}
-                  onChange={(e) => setFormAlias(e.target.value)}
-                  className="w-full h-10 px-3 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg"
-                />
+
+            {/* Modal Scrollable Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs custom-scrollbar">
+              {/* SECTION 1 — BASIC INFORMATION */}
+              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                  <Building2 className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                    Section 1 — Basic Information
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Virtual Key Name */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Virtual Key Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formAlias}
+                      onChange={(e) => setFormAlias(e.target.value)}
+                      placeholder="Enter Virtual Key Name (e.g. prod-ai-completions)"
+                      maxLength={100}
+                      className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-medium text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all ${
+                        formTouched && (!formAlias.trim() || isDuplicateName)
+                          ? "border-rose-500 focus:ring-rose-500/20"
+                          : "border-neutral-300 dark:border-neutral-700 focus:border-primary-500 focus:ring-primary-500/20"
+                      }`}
+                    />
+                    <div className="flex items-center justify-between mt-1 text-[11px]">
+                      {formAlias.trim() === "" && formTouched ? (
+                        <span className="text-rose-500 font-medium">Virtual Key Name is required.</span>
+                      ) : isDuplicateName ? (
+                        <span className="text-rose-500 font-medium">A Virtual Key with this name already exists.</span>
+                      ) : (
+                        <span className="text-neutral-400">Must be unique across your organization.</span>
+                      )}
+                      <span className="text-neutral-400 font-mono">{formAlias.length}/100</span>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Description <span className="text-neutral-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      placeholder="Describe the purpose, application scope, or target service for this key..."
+                      maxLength={300}
+                      rows={2}
+                      className="w-full p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
+                    />
+                    <div className="text-right text-[11px] text-neutral-400 font-mono">
+                      {formDescription.length}/300
+                    </div>
+                  </div>
+
+                  {/* Owner (Searchable Dropdown) */}
+                  <div className="space-y-1 relative owner-dropdown-container">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Owner <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowOwnerDropdown(!showOwnerDropdown)}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Users className="w-3.5 h-3.5 text-neutral-400" />
+                        {formOwner}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
+                    </button>
+
+                    {showOwnerDropdown && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-2 space-y-1 animate-fadeIn">
+                        <div className="relative mb-1">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                          <input
+                            type="text"
+                            value={ownerSearch}
+                            onChange={(e) => setOwnerSearch(e.target.value)}
+                            placeholder="Search owners..."
+                            className="w-full h-8 pl-8 pr-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="max-h-36 overflow-y-auto space-y-0.5">
+                          {AVAILABLE_OWNERS.filter((o) =>
+                            o.toLowerCase().includes(ownerSearch.toLowerCase())
+                          ).map((ownerEmail) => (
+                            <button
+                              key={ownerEmail}
+                              type="button"
+                              onClick={() => {
+                                setFormOwner(ownerEmail);
+                                setShowOwnerDropdown(false);
+                              }}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center justify-between text-xs transition-colors ${
+                                formOwner === ownerEmail ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400 font-semibold" : "text-neutral-700 dark:text-neutral-300"
+                              }`}
+                            >
+                              <span>{ownerEmail}</span>
+                              {formOwner === ownerEmail && <Check className="w-3.5 h-3.5 text-primary-600" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Team (Searchable Dropdown) */}
+                  <div className="space-y-1 relative team-dropdown-container">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Team <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTeamDropdown(!showTeamDropdown)}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Users className="w-3.5 h-3.5 text-neutral-400" />
+                        {formTeam}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
+                    </button>
+
+                    {showTeamDropdown && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-2 space-y-1 animate-fadeIn">
+                        <div className="relative mb-1">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                          <input
+                            type="text"
+                            value={teamSearch}
+                            onChange={(e) => setTeamSearch(e.target.value)}
+                            placeholder="Search teams..."
+                            className="w-full h-8 pl-8 pr-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="max-h-36 overflow-y-auto space-y-0.5">
+                          {AVAILABLE_TEAMS.filter((t) =>
+                            t.name.toLowerCase().includes(teamSearch.toLowerCase())
+                          ).map((teamObj) => (
+                            <button
+                              key={teamObj.name}
+                              type="button"
+                              onClick={() => {
+                                handleSelectTeam(teamObj.name);
+                                setShowTeamDropdown(false);
+                              }}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center justify-between text-xs transition-colors ${
+                                formTeam === teamObj.name ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400 font-semibold" : "text-neutral-700 dark:text-neutral-300"
+                              }`}
+                            >
+                              <div>
+                                <div>{teamObj.name}</div>
+                                <div className="text-[10px] text-neutral-400">{teamObj.org}</div>
+                              </div>
+                              {formTeam === teamObj.name && <Check className="w-3.5 h-3.5 text-primary-600" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Organization (Read-Only) */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Organization <span className="text-neutral-400 font-normal">(Auto-Inherited from Team)</span>
+                    </label>
+                    <div className="h-10 px-3 bg-neutral-100 dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
+                      <Building2 className="w-3.5 h-3.5 text-neutral-400" />
+                      {formOrg}
+                      <span className="ml-auto text-[10px] font-normal px-2 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 rounded">
+                        Read Only
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2 — MODEL ACCESS */}
+              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                    <div>
+                      <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                        Section 2 — Model Access
+                      </h4>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Configure which AI models can be routed through this Virtual Key.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* All Models Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-neutral-950 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={allModelsSelected}
+                      onChange={(e) => {
+                        setAllModelsSelected(e.target.checked);
+                        if (e.target.checked) {
+                          setFormModels(AVAILABLE_MODELS.map((m) => m.id));
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+                      Support All Models
+                    </span>
+                  </label>
+                </div>
+
+                {/* Model Controls bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={modelSearchQuery}
+                      onChange={(e) => setModelSearchQuery(e.target.value)}
+                      placeholder="Search models by name or provider..."
+                      className="w-full h-8 pl-8 pr-2 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormModels(AVAILABLE_MODELS.map((m) => m.id));
+                        setAllModelsSelected(true);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/50 rounded-md transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormModels([]);
+                        setAllModelsSelected(false);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-neutral-500 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 rounded-md transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                {/* Selected Model Chips Display */}
+                <div className="p-3 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl space-y-2">
+                  <div className="text-[11px] font-semibold text-neutral-500 flex items-center justify-between">
+                    <span>Selected Models ({allModelsSelected ? "All Models" : formModels.length}):</span>
+                    {formModels.length > 4 && !allModelsSelected && (
+                      <span className="text-primary-600 font-medium">+{formModels.length - 4} More selected</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allModelsSelected ? (
+                      <span className="px-2.5 py-1 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 font-semibold text-xs flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" /> All Models Enabled
+                      </span>
+                    ) : formModels.length === 0 ? (
+                      <span className="text-neutral-400 italic text-xs">No models selected (defaults to GPT-4o)</span>
+                    ) : (
+                      formModels.slice(0, 5).map((mId) => {
+                        const mObj = AVAILABLE_MODELS.find((m) => m.id === mId);
+                        const label = mObj ? mObj.name : mId;
+                        return (
+                          <span
+                            key={mId}
+                            className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium text-xs flex items-center gap-1.5 border border-neutral-200 dark:border-neutral-700"
+                          >
+                            {label}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAllModelsSelected(false);
+                                setFormModels(formModels.filter((id) => id !== mId));
+                              }}
+                              className="text-neutral-400 hover:text-rose-500 transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })
+                    )}
+                    {!allModelsSelected && formModels.length > 5 && (
+                      <span className="px-2.5 py-1 rounded-full bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-bold text-xs">
+                        +{formModels.length - 5} More
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Model Options List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {AVAILABLE_MODELS.filter(
+                    (m) =>
+                      m.name.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
+                      m.provider.toLowerCase().includes(modelSearchQuery.toLowerCase())
+                  ).map((mObj) => {
+                    const isChecked = allModelsSelected || formModels.includes(mObj.id);
+                    return (
+                      <label
+                        key={mObj.id}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                          isChecked
+                            ? "bg-primary-50/50 dark:bg-primary-950/40 border-primary-300 dark:border-primary-800"
+                            : "bg-white dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setAllModelsSelected(false);
+                              if (formModels.includes(mObj.id)) {
+                                setFormModels(formModels.filter((id) => id !== mObj.id));
+                              } else {
+                                setFormModels([...formModels, mObj.id]);
+                              }
+                            }}
+                            className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500"
+                          />
+                          <div>
+                            <div className="font-semibold text-neutral-900 dark:text-white">
+                              {mObj.name}
+                            </div>
+                            <div className="text-[10px] text-neutral-400">{mObj.provider}</div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 font-medium">
+                          {mObj.badge}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION 3 — BUDGET CONFIGURATION */}
+              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                  <DollarSign className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <div>
+                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                      Section 3 — Budget Configuration
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Set maximum spend limits and automated reset schedules.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Maximum Budget */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Maximum Budget ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 font-semibold">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formMaxBudget}
+                        onChange={(e) => setFormMaxBudget(e.target.value)}
+                        placeholder="500"
+                        className={`w-full h-10 pl-7 pr-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 ${
+                          isBudgetInvalid ? "border-rose-500 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700 focus:border-primary-500 focus:ring-primary-500/20"
+                        }`}
+                      />
+                    </div>
+                    {isBudgetInvalid ? (
+                      <p className="text-rose-500 text-[11px]">Must be a non-negative number.</p>
+                    ) : (
+                      <p className="text-[11px] text-neutral-400">Enter 0 for unlimited hard budget cap.</p>
+                    )}
+                  </div>
+
+                  {/* Soft Budget */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Soft Budget ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 font-semibold">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formSoftBudget}
+                        onChange={(e) => setFormSoftBudget(e.target.value)}
+                        placeholder="400"
+                        className={`w-full h-10 pl-7 pr-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 ${
+                          isSoftBudgetInvalid ? "border-rose-500 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700 focus:border-primary-500 focus:ring-primary-500/20"
+                        }`}
+                      />
+                    </div>
+                    {isSoftBudgetInvalid ? (
+                      <p className="text-rose-500 text-[11px]">Soft budget cannot exceed maximum budget.</p>
+                    ) : (
+                      <p className="text-[11px] text-neutral-400">Alert triggers at this spend threshold.</p>
+                    )}
+                  </div>
+
+                  {/* Budget Reset Cycle */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Budget Reset Cycle
+                    </label>
+                    <select
+                      value={formBudgetCycle}
+                      onChange={(e) => setFormBudgetCycle(e.target.value)}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
+                    >
+                      <option value="Daily">Daily</option>
+                      <option value="Weekly">Weekly</option>
+                      <option value="Monthly">Monthly</option>
+                      <option value="Quarterly">Quarterly</option>
+                      <option value="Yearly">Yearly</option>
+                      <option value="Never">Never (One-Time Cap)</option>
+                    </select>
+                    <p className="text-[11px] text-neutral-400">Resets accrued spend counter.</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg flex items-center gap-2 text-amber-800 dark:text-amber-300 text-[11px]">
+                  <HelpCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                  <span>
+                    Soft budget alerts notify team owners via webhooks prior to API requests being hard-throttled at 100% cap.
+                  </span>
+                </div>
+              </div>
+
+              {/* SECTION 4 — RATE LIMITS */}
+              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                  <Activity className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <div>
+                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                      Section 4 — Rate Limits
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Configure Tokens Per Minute (TPM) and Requests Per Minute (RPM).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* TPM Limit */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      TPM (Tokens Per Minute)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formTpmLimit}
+                      onChange={(e) => setFormTpmLimit(e.target.value)}
+                      placeholder="100000"
+                      className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 ${
+                        isTpmInvalid ? "border-rose-500 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700 focus:border-primary-500 focus:ring-primary-500/20"
+                      }`}
+                    />
+                    {isTpmInvalid ? (
+                      <p className="text-rose-500 text-[11px]">Must be a positive value.</p>
+                    ) : (
+                      <p className="text-[11px] text-neutral-400">Default: 100,000 TPM limit.</p>
+                    )}
+                  </div>
+
+                  {/* RPM Limit */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      RPM (Requests Per Minute)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formRpmLimit}
+                      onChange={(e) => setFormRpmLimit(e.target.value)}
+                      placeholder="1000"
+                      className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 ${
+                        isRpmInvalid ? "border-rose-500 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700 focus:border-primary-500 focus:ring-primary-500/20"
+                      }`}
+                    />
+                    {isRpmInvalid ? (
+                      <p className="text-rose-500 text-[11px]">Must be a positive value.</p>
+                    ) : (
+                      <p className="text-[11px] text-neutral-400">Default: 1,000 RPM limit.</p>
+                    )}
+                  </div>
+
+                  {/* Optional Model-specific limits */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Optional Model-Specific Overrides <span className="text-neutral-400 font-normal">(Advanced JSON/Key-Value)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formModelSpecificLimits}
+                      onChange={(e) => setFormModelSpecificLimits(e.target.value)}
+                      placeholder="e.g. gpt-4o: 50k TPM, claude-3-5-sonnet: 20k TPM"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 5 — PERMISSIONS */}
+              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                  <ShieldCheck className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <div>
+                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                      Section 5 — Permissions & Capabilities
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Toggle operational capabilities permitted for requests authenticated with this key.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { id: "apiAccess", label: "AI API Access", desc: "Allow proxying chat & embedding completions" },
+                    { id: "modelAccess", label: "Model Access", desc: "Allow listing accessible model catalogs" },
+                    { id: "spendTracking", label: "Spend Tracking", desc: "Log real-time token spend telemetry" },
+                    { id: "logging", label: "Payload Logging", desc: "Ship audit logs to SIEM integration" },
+                    { id: "teamResources", label: "Team Resources", desc: "Allow team members to share key" },
+                  ].map((perm) => {
+                    const isChecked = (formCapabilities as any)[perm.id];
+                    return (
+                      <label
+                        key={perm.id}
+                        className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                          isChecked
+                            ? "bg-white dark:bg-neutral-950 border-primary-300 dark:border-primary-800 shadow-2xs"
+                            : "bg-white dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 opacity-75"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) =>
+                            setFormCapabilities((prev) => ({ ...prev, [perm.id]: e.target.checked }))
+                          }
+                          className="w-4 h-4 mt-0.5 rounded text-primary-600 focus:ring-primary-500 shrink-0"
+                        />
+                        <div>
+                          <div className="font-semibold text-neutral-900 dark:text-white">
+                            {perm.label}
+                          </div>
+                          <div className="text-[10px] text-neutral-400 mt-0.5">{perm.desc}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION 6 — ADVANCED SETTINGS (COLLAPSED BY DEFAULT) */}
+              <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                  className="w-full px-4 py-3 bg-neutral-100/70 dark:bg-neutral-800/50 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 transition-colors flex items-center justify-between text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-neutral-500" />
+                    <span className="font-bold text-xs text-neutral-900 dark:text-white">
+                      Section 6 — Advanced Settings (Metadata, Expiration, Allowed IPs, Notes)
+                    </span>
+                  </div>
+                  {showAdvancedSettings ? (
+                    <ChevronUp className="w-4 h-4 text-neutral-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-neutral-400" />
+                  )}
+                </button>
+
+                {showAdvancedSettings && (
+                  <div className="p-4 bg-neutral-50/30 dark:bg-neutral-900/30 space-y-4 animate-fadeIn border-t border-neutral-200 dark:border-neutral-800">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Metadata / Tags */}
+                      <div className="space-y-1">
+                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                          Metadata / Tags
+                        </label>
+                        <div className="relative">
+                          <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                          <input
+                            type="text"
+                            value={formTags}
+                            onChange={(e) => setFormTags(e.target.value)}
+                            placeholder="env:production, gateway:v1, team:ml"
+                            className="w-full h-10 pl-9 pr-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs"
+                          />
+                        </div>
+                        <p className="text-[10px] text-neutral-400">Comma-separated tag pairs.</p>
+                      </div>
+
+                      {/* Expiration Date */}
+                      <div className="space-y-1">
+                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                          Expiration Duration
+                        </label>
+                        <select
+                          value={formExpiryDuration}
+                          onChange={(e) => setFormExpiryDuration(e.target.value)}
+                          className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                        >
+                          <option value="Never">Never (No expiration)</option>
+                          <option value="30 Days">30 Days</option>
+                          <option value="60 Days">60 Days</option>
+                          <option value="90 Days">90 Days</option>
+                          <option value="1 Year">1 Year</option>
+                        </select>
+                      </div>
+
+                      {/* Allowed IPs */}
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                          Allowed IPs <span className="text-neutral-400 font-normal">(IP Whitelist / CIDR)</span>
+                        </label>
+                        <div className="relative">
+                          <Globe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                          <input
+                            type="text"
+                            value={formAllowedIps}
+                            onChange={(e) => setFormAllowedIps(e.target.value)}
+                            placeholder="e.g. 192.168.1.1, 10.0.0.0/24 (Leave blank to allow all IPs)"
+                            className="w-full h-10 pl-9 pr-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Internal Notes */}
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                          Internal Notes
+                        </label>
+                        <textarea
+                          value={formNotes}
+                          onChange={(e) => setFormNotes(e.target.value)}
+                          placeholder="Architectural or internal ticketing reference numbers..."
+                          rows={2}
+                          className="w-full p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs resize-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-end gap-2 bg-neutral-50 dark:bg-neutral-900">
-              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+
+            {/* Modal Sticky Footer */}
+            <div className="px-6 py-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/80 dark:bg-neutral-900/80 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg transition-colors"
+              >
                 Cancel
               </button>
-              <PrimaryButton onClick={handleSaveVirtualKey}>
-                {isEditMode ? "Save Changes" : "Generate Virtual Key"}
-              </PrimaryButton>
+
+              <div className="flex items-center gap-2">
+                {isGenerating ? (
+                  <button
+                    disabled
+                    className="px-5 py-2 text-xs font-semibold text-white bg-primary-600/80 rounded-lg flex items-center gap-2 cursor-not-allowed shadow-xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    {isEditMode ? "Saving Changes..." : "Generating Virtual Key..."}
+                  </button>
+                ) : (
+                  <PrimaryButton
+                    onClick={handleSaveVirtualKey}
+                    disabled={!isFormValid}
+                    className={!isFormValid ? "opacity-50 cursor-not-allowed" : ""}
+                  >
+                    {isEditMode ? "Save Changes" : "Generate Virtual Key"}
+                  </PrimaryButton>
+                )}
+              </div>
             </div>
           </div>
         </div>

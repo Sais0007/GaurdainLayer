@@ -34,6 +34,11 @@ export function useNavigationHelper() {
     "configurations-group": t.nav.configurations,
     "logs-group": t.nav.logs,
     "hb-templates": t.nav.hbTemplates,
+    "virtual-key": (t.nav as any).virtualKey || "Virtual Key",
+    "teams": (t.nav as any).teams || "Teams",
+    "internal-users": (t.nav as any).internalUsers || "Internal Users",
+    "organizations": (t.nav as any).organizations || "Organizations",
+    "ai-gateway": (t.nav as any).aiGateway || "AI Gateway",
   };
 
   const getPageLabel = (pageId: string, fallback: string = ""): string => {
@@ -43,6 +48,10 @@ export function useNavigationHelper() {
   const getSingularName = (pageId: string): string => {
     const singularMap: Record<string, string> = {
       "user-management": "User",
+      "virtual-key": "Virtual Key",
+      "teams": "Team",
+      "internal-users": "User",
+      "organizations": "Organization",
       "role-management": "Role",
       "country": "Country",
       "state": "State",

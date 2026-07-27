@@ -19,6 +19,8 @@ import { SiteMap } from "./components/SiteMap";
 import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import VirtualKeyManagement from "./components/VirtualKeyManagement";
+import OrganizationManagement from "./components/OrganizationManagement";
+import { ErrorBoundary } from "./components/hb/common/ErrorBoundary";
 import TeamsManagement from "./components/TeamsManagement";
 import { FeedbackSystem } from "./components/FeedbackSystem";
 import { GlobalFooter } from "./components/GlobalFooter";
@@ -26,7 +28,7 @@ import { LanguageProvider } from "../i18n/LanguageContext";
 
 export default function App() {
   const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       const saved = localStorage.getItem("theme");
       return saved === "dark";
     }
@@ -34,7 +36,7 @@ export default function App() {
   });
 
   const [currentTheme, setCurrentTheme] = useState(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       const saved = localStorage.getItem("colorTheme");
       const validThemes = ["default-black", "ocean-blue", "emerald-green", "violet-purple", "amber-orange"];
       return validThemes.includes(saved || "") ? saved! : "default-black";
@@ -48,7 +50,7 @@ export default function App() {
   const [menuOrientation, setMenuOrientation] = useState<
     "vertical" | "horizontal"
   >(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       return (
         (localStorage.getItem(
           "menuOrientation",
@@ -61,7 +63,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
 
   const [logoUrl, setLogoUrl] = useState(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       return localStorage.getItem("platformLogo") || logoDefault;
     }
     return logoDefault;
@@ -69,7 +71,9 @@ export default function App() {
 
   useEffect(() => {
     // Clear platformLogo from localStorage to force load of the new cursive HB logo
-    localStorage.removeItem("platformLogo");
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("platformLogo");
+    }
     setLogoUrl(logoDefault);
   }, []);
 
@@ -79,15 +83,15 @@ export default function App() {
 
     if (isDark) {
       root.classList.add("dark");
-      localStorage.setItem("theme", "dark");
+      if (typeof localStorage !== "undefined") localStorage.setItem("theme", "dark");
     } else {
       root.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+      if (typeof localStorage !== "undefined") localStorage.setItem("theme", "light");
     }
   }, [isDark]);
 
   useEffect(() => {
-    localStorage.setItem("colorTheme", currentTheme);
+    if (typeof localStorage !== "undefined") localStorage.setItem("colorTheme", currentTheme);
     document.documentElement.setAttribute(
       "data-theme",
       currentTheme,
@@ -95,7 +99,7 @@ export default function App() {
   }, [currentTheme]);
 
   useEffect(() => {
-    localStorage.setItem("menuOrientation", menuOrientation);
+    if (typeof localStorage !== "undefined") localStorage.setItem("menuOrientation", menuOrientation);
   }, [menuOrientation]);
 
   const handleLogout = () => {
@@ -180,10 +184,14 @@ export default function App() {
               <TeamsManagement />
             ) : currentPage === "internal-users" || currentPage === "user-management" ? (
               <UserManagement />
-            ) : currentPage === "organizations" ? (
-              <MasterManagement masterType="country" />
-            ) : currentPage === "virtual-key" ? (
-              <VirtualKeyManagement />
+            ) : currentPage === "organizations" || currentPage === "ai-organizations" ? (
+              <ErrorBoundary moduleName="Organizations">
+                <OrganizationManagement />
+              </ErrorBoundary>
+            ) : currentPage === "virtual-key" || currentPage === "virtual-keys" || currentPage === "ai-gateway" ? (
+              <ErrorBoundary moduleName="Virtual Keys">
+                <VirtualKeyManagement />
+              </ErrorBoundary>
             ) : currentPage === "event-management" ? (
               <EventManagement />
             ) : currentPage === "static-pages" ? (

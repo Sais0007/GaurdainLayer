@@ -28,16 +28,20 @@ const LanguageContext = createContext<LanguageContextType>({
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       return (localStorage.getItem("appLanguage") as Language) || "en";
     }
     return "en";
   });
 
   useEffect(() => {
-    localStorage.setItem("appLanguage", language);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("appLanguage", language);
+    }
     // Set lang attribute for accessibility
-    document.documentElement.setAttribute("lang", language);
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("lang", language);
+    }
   }, [language]);
 
   const setLanguage = (lang: Language) => setLanguageState(lang);
