@@ -946,32 +946,32 @@ export default function OrganizationManagement() {
               )}
             </div>
 
-            {/* 4. Create Organization Primary Button */}
-            <PrimaryButton icon={Plus} onClick={handleOpenCreateModal}>
-              Create Organization
-            </PrimaryButton>
-
-            {/* 5. Export */}
+            {/* 4. Export */}
             <IconButton
               icon={Download}
               label="Export"
               onClick={() => setShowExportModal(true)}
             />
 
-            {/* 6. Refresh */}
+            {/* 5. Refresh */}
             <IconButton
               icon={RefreshCw}
               label="Refresh"
               onClick={() => toast.success("Refreshed Organizations list")}
             />
 
-            {/* 7. Show/Hide Summary Toggle */}
+            {/* 6. Show/Hide Summary Toggle */}
             <IconButton
               icon={showSummary ? EyeOff : BarChart3}
               label={showSummary ? "Hide Summary" : "Show Summary"}
               onClick={() => setShowSummary(!showSummary)}
               title={showSummary ? "Hide Summary Cards" : "Show Summary Cards"}
             />
+
+            {/* 7. Create Organization Primary Button (Last Position) */}
+            <PrimaryButton icon={Plus} onClick={handleOpenCreateModal}>
+              Create Organization
+            </PrimaryButton>
           </PageHeader>
 
           {/* Collapsible Summary Cards */}

@@ -951,32 +951,32 @@ export default function VirtualKeyManagement() {
               )}
             </div>
 
-            {/* 4. Create Virtual Key Primary Button */}
-            <PrimaryButton icon={Plus} onClick={handleOpenCreateModal}>
-              Create Virtual Key
-            </PrimaryButton>
-
-            {/* 5. Export */}
+            {/* 4. Export */}
             <IconButton
               icon={Download}
               label="Export"
               onClick={() => toast.success("Exporting Virtual Keys to CSV...")}
             />
 
-            {/* 6. Refresh */}
+            {/* 5. Refresh */}
             <IconButton
               icon={RefreshCw}
               label="Refresh"
               onClick={() => toast.success("Refreshed Virtual Keys list")}
             />
 
-            {/* 7. Show/Hide Summary Toggle */}
+            {/* 6. Show/Hide Summary Toggle */}
             <IconButton
               icon={showSummary ? EyeOff : BarChart3}
               label={showSummary ? "Hide Summary" : "Show Summary"}
               onClick={() => setShowSummary(!showSummary)}
               title={showSummary ? "Hide KPI Summary Cards" : "Show KPI Summary Cards"}
             />
+
+            {/* 7. Create Virtual Key Primary Button (Last Position) */}
+            <PrimaryButton icon={Plus} onClick={handleOpenCreateModal}>
+              Create Virtual Key
+            </PrimaryButton>
           </PageHeader>
 
           {/* Collapsible KPI Summary Cards */}
