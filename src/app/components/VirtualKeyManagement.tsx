@@ -369,7 +369,6 @@ export default function VirtualKeyManagement() {
   const [formBudgetCycle, setFormBudgetCycle] = useState("Monthly");
   const [formTpmLimit, setFormTpmLimit] = useState("100000");
   const [formRpmLimit, setFormRpmLimit] = useState("1000");
-  const [formModelSpecificLimits, setFormModelSpecificLimits] = useState("");
   const [formExpiryDuration, setFormExpiryDuration] = useState("Never");
   const [formGracePeriod, setFormGracePeriod] = useState("7 Days");
   const [formPolicies, setFormPolicies] = useState<string[]>(["Rate Limiting", "IP Whitelist"]);
@@ -377,24 +376,11 @@ export default function VirtualKeyManagement() {
   const [formLogging, setFormLogging] = useState("Splunk Enterprise");
   const [formAutoRotation, setFormAutoRotation] = useState(true);
   const [formCallbackUrl, setFormCallbackUrl] = useState("https://api.company.com/webhooks/ai-audit");
-
-  const [formCapabilities, setFormCapabilities] = useState({
-    apiAccess: true,
-    modelAccess: true,
-    spendTracking: true,
-    logging: true,
-    teamResources: false,
-  });
-
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-  const [formTags, setFormTags] = useState("env:production, gateway:v1");
-  const [formAllowedIps, setFormAllowedIps] = useState("");
-  const [formNotes, setFormNotes] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
 
   // Detail View Tab
-  const [detailTab, setDetailTab] = useState<"overview" | "configuration" | "usage" | "policies" | "logs">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "configuration" | "usage" | "logs">("overview");
 
   // Logs Tab Filters & Search
   const [logsSearch, setLogsSearch] = useState("");
@@ -504,19 +490,7 @@ export default function VirtualKeyManagement() {
     setFormBudgetCycle("Monthly");
     setFormTpmLimit("100000");
     setFormRpmLimit("1000");
-    setFormModelSpecificLimits("");
-    setFormCapabilities({
-      apiAccess: true,
-      modelAccess: true,
-      spendTracking: true,
-      logging: true,
-      teamResources: false,
-    });
-    setShowAdvancedSettings(false);
-    setFormTags("env:production, gateway:v1");
     setFormExpiryDuration("Never");
-    setFormAllowedIps("");
-    setFormNotes("");
     setFormTouched(false);
     setIsGenerating(false);
     setShowCreateModal(true);
@@ -539,14 +513,6 @@ export default function VirtualKeyManagement() {
     setFormBudgetCycle("Monthly");
     setFormTpmLimit(keyItem.tpmLimit.toString());
     setFormRpmLimit(keyItem.rpmLimit.toString());
-    setFormModelSpecificLimits("");
-    setFormCapabilities({
-      apiAccess: true,
-      modelAccess: true,
-      spendTracking: true,
-      logging: true,
-      teamResources: true,
-    });
     setFormExpiryDuration(keyItem.expiryDuration);
     setFormGracePeriod(keyItem.gracePeriod);
     setFormPolicies(keyItem.policies);
@@ -554,10 +520,6 @@ export default function VirtualKeyManagement() {
     setFormLogging(keyItem.loggingIntegration);
     setFormAutoRotation(keyItem.autoRotation);
     setFormCallbackUrl(keyItem.callbackUrl || "");
-    setShowAdvancedSettings(false);
-    setFormTags("env:production");
-    setFormAllowedIps("");
-    setFormNotes("");
     setFormTouched(false);
     setIsGenerating(false);
     setShowCreateModal(true);
@@ -1536,7 +1498,7 @@ export default function VirtualKeyManagement() {
             {/* Detail Tabs */}
             <div className="border-b border-neutral-200 dark:border-neutral-800 overflow-x-auto">
               <div className="flex gap-6 text-xs font-semibold min-w-max">
-                {(["overview", "configuration", "usage", "policies", "logs"] as const).map((tab) => (
+                {(["overview", "configuration", "usage", "logs"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setDetailTab(tab)}
@@ -1567,7 +1529,7 @@ export default function VirtualKeyManagement() {
                     </h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div>
+                      <div className="sm:col-span-2">
                         <div className="text-neutral-400 font-medium mb-0.5">Secret Key</div>
                         <div className="font-mono font-medium text-neutral-800 dark:text-neutral-200 flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200/60 dark:border-neutral-700">
                           <span className="truncate">{selectedKey.secretKeyMasked}</span>
@@ -1579,13 +1541,6 @@ export default function VirtualKeyManagement() {
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-neutral-400 font-medium mb-0.5">Authorization Scope</div>
-                        <div className="font-semibold text-neutral-800 dark:text-neutral-200 p-2 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200/60 dark:border-neutral-700">
-                          {selectedKey.keyType} (Allowed API Routes)
                         </div>
                       </div>
                     </div>
@@ -1629,7 +1584,6 @@ export default function VirtualKeyManagement() {
                       <div className="space-y-1 text-xs pt-1">
                         <div className="flex justify-between"><span className="text-neutral-400">TPM Limit:</span> <span className="font-mono font-semibold">{selectedKey.tpmLimit.toLocaleString()} Tokens/min</span></div>
                         <div className="flex justify-between"><span className="text-neutral-400">RPM Limit:</span> <span className="font-mono font-semibold">{selectedKey.rpmLimit.toLocaleString()} Reqs/min</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-400">Max Parallel Requests:</span> <span className="font-mono font-semibold">50 Concurrent</span></div>
                       </div>
                     </div>
 
@@ -1641,7 +1595,6 @@ export default function VirtualKeyManagement() {
                       <div className="space-y-1 text-xs pt-1">
                         <div className="flex justify-between"><span className="text-neutral-400">Status:</span> <span className="font-semibold text-emerald-600">Enabled</span></div>
                         <div className="flex justify-between"><span className="text-neutral-400">Rotation Cycle:</span> <span className="font-semibold">Every 90 Days</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-400">Grace Period:</span> <span className="font-semibold">{selectedKey.gracePeriod}</span></div>
                       </div>
                     </div>
                   </div>
@@ -1687,7 +1640,7 @@ export default function VirtualKeyManagement() {
             {/* TAB 2: CONFIGURATION TAB                                                  */}
             {/* ========================================================================= */}
             {detailTab === "configuration" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
+              <div className="animate-fadeIn">
                 {/* Models Card */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-3">
                   <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
@@ -1712,72 +1665,6 @@ export default function VirtualKeyManagement() {
                           </span>
                         ))}
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Authorization Card */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-blue-600" />
-                    Authorization & Route Permissions
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800">
-                      <span className="text-neutral-500">Key Type:</span>
-                      <span className="font-semibold text-primary-600">{selectedKey.keyType}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800">
-                      <span className="text-neutral-500">Allowed Routes:</span>
-                      <span className="font-mono font-semibold">/v1/chat/completions, /v1/embeddings</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800">
-                      <span className="text-neutral-500">Management Access:</span>
-                      <span className="font-semibold text-neutral-600">Restricted</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Permissions & Guardrails Card */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    Guardrails & Security Policies
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedKey.guardrails.map((g) => (
-                        <span key={g} className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-medium border border-emerald-200/60">
-                          {g}
-                        </span>
-                      ))}
-                      {selectedKey.policies.map((p) => (
-                        <span key={p} className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium border border-blue-200/60">
-                          {p}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Logging & Webhooks Card */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-purple-600" />
-                    Logging Integration & Webhooks
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800">
-                      <span className="text-neutral-500">Logging Provider:</span>
-                      <span className="font-semibold">{selectedKey.loggingIntegration}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-neutral-100 dark:border-neutral-800">
-                      <span className="text-neutral-500">Callback URL:</span>
-                      <span className="font-mono text-neutral-700 dark:text-neutral-300 truncate max-w-[200px]">{selectedKey.callbackUrl || "Not Configured"}</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-neutral-500">Webhook Status:</span>
-                      <span className="font-semibold text-emerald-600">Healthy (200 OK)</span>
                     </div>
                   </div>
                 </div>
@@ -2019,7 +1906,7 @@ export default function VirtualKeyManagement() {
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Building2 className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 1 — Basic Information
+                    Basic Information
                   </h4>
                 </div>
 
@@ -2180,6 +2067,24 @@ export default function VirtualKeyManagement() {
                     )}
                   </div>
 
+                  {/* Expiration Duration */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Expiration Duration
+                    </label>
+                    <select
+                      value={formExpiryDuration}
+                      onChange={(e) => setFormExpiryDuration(e.target.value)}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
+                    >
+                      <option value="Never">Never (No expiration)</option>
+                      <option value="30 Days">30 Days</option>
+                      <option value="60 Days">60 Days</option>
+                      <option value="90 Days">90 Days</option>
+                      <option value="1 Year">1 Year</option>
+                    </select>
+                  </div>
+
                   {/* Organization (Read-Only) */}
                   <div className="space-y-1 md:col-span-2">
                     <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
@@ -2203,7 +2108,7 @@ export default function VirtualKeyManagement() {
                     <Cpu className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                     <div>
                       <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                        Section 2 — Model Access
+                        Model Access
                       </h4>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                         Configure which AI models can be routed through this Virtual Key.
@@ -2366,7 +2271,7 @@ export default function VirtualKeyManagement() {
                   <DollarSign className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                   <div>
                     <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Section 3 — Budget Configuration
+                      Budget Configuration
                     </h4>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                       Set maximum spend limits and automated reset schedules.
@@ -2460,7 +2365,7 @@ export default function VirtualKeyManagement() {
                   <Activity className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                   <div>
                     <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Section 4 — Rate Limits
+                      Rate Limits
                     </h4>
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                       Configure Tokens Per Minute (TPM) and Requests Per Minute (RPM).
@@ -2512,167 +2417,7 @@ export default function VirtualKeyManagement() {
                       <p className="text-[11px] text-neutral-400">Default: 1,000 RPM limit.</p>
                     )}
                   </div>
-
-                  {/* Optional Model-specific limits */}
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Optional Model-Specific Overrides <span className="text-neutral-400 font-normal">(Advanced JSON/Key-Value)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formModelSpecificLimits}
-                      onChange={(e) => setFormModelSpecificLimits(e.target.value)}
-                      placeholder="e.g. gpt-4o: 50k TPM, claude-3-5-sonnet: 20k TPM"
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500"
-                    />
-                  </div>
                 </div>
-              </div>
-
-              {/* SECTION 5 — PERMISSIONS */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <ShieldCheck className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                  <div>
-                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Section 5 — Permissions & Capabilities
-                    </h4>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Toggle operational capabilities permitted for requests authenticated with this key.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    { id: "apiAccess", label: "AI API Access", desc: "Allow proxying chat & embedding completions" },
-                    { id: "modelAccess", label: "Model Access", desc: "Allow listing accessible model catalogs" },
-                    { id: "spendTracking", label: "Spend Tracking", desc: "Log real-time token spend telemetry" },
-                    { id: "logging", label: "Payload Logging", desc: "Ship audit logs to SIEM integration" },
-                    { id: "teamResources", label: "Team Resources", desc: "Allow team members to share key" },
-                  ].map((perm) => {
-                    const isChecked = (formCapabilities as any)[perm.id];
-                    return (
-                      <label
-                        key={perm.id}
-                        className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
-                          isChecked
-                            ? "bg-white dark:bg-neutral-950 border-primary-300 dark:border-primary-800 shadow-2xs"
-                            : "bg-white dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 opacity-75"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) =>
-                            setFormCapabilities((prev) => ({ ...prev, [perm.id]: e.target.checked }))
-                          }
-                          className="w-4 h-4 mt-0.5 rounded text-primary-600 focus:ring-primary-500 shrink-0"
-                        />
-                        <div>
-                          <div className="font-semibold text-neutral-900 dark:text-white">
-                            {perm.label}
-                          </div>
-                          <div className="text-[10px] text-neutral-400 mt-0.5">{perm.desc}</div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* SECTION 6 — ADVANCED SETTINGS (COLLAPSED BY DEFAULT) */}
-              <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                  className="w-full px-4 py-3 bg-neutral-100/70 dark:bg-neutral-800/50 hover:bg-neutral-200/50 dark:hover:bg-neutral-800 transition-colors flex items-center justify-between text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-neutral-500" />
-                    <span className="font-bold text-xs text-neutral-900 dark:text-white">
-                      Section 6 — Advanced Settings (Metadata, Expiration, Allowed IPs, Notes)
-                    </span>
-                  </div>
-                  {showAdvancedSettings ? (
-                    <ChevronUp className="w-4 h-4 text-neutral-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-neutral-400" />
-                  )}
-                </button>
-
-                {showAdvancedSettings && (
-                  <div className="p-4 bg-neutral-50/30 dark:bg-neutral-900/30 space-y-4 animate-fadeIn border-t border-neutral-200 dark:border-neutral-800">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Metadata / Tags */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                          Metadata / Tags
-                        </label>
-                        <div className="relative">
-                          <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                          <input
-                            type="text"
-                            value={formTags}
-                            onChange={(e) => setFormTags(e.target.value)}
-                            placeholder="env:production, gateway:v1, team:ml"
-                            className="w-full h-10 pl-9 pr-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs"
-                          />
-                        </div>
-                        <p className="text-[10px] text-neutral-400">Comma-separated tag pairs.</p>
-                      </div>
-
-                      {/* Expiration Date */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                          Expiration Duration
-                        </label>
-                        <select
-                          value={formExpiryDuration}
-                          onChange={(e) => setFormExpiryDuration(e.target.value)}
-                          className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
-                        >
-                          <option value="Never">Never (No expiration)</option>
-                          <option value="30 Days">30 Days</option>
-                          <option value="60 Days">60 Days</option>
-                          <option value="90 Days">90 Days</option>
-                          <option value="1 Year">1 Year</option>
-                        </select>
-                      </div>
-
-                      {/* Allowed IPs */}
-                      <div className="space-y-1 md:col-span-2">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                          Allowed IPs <span className="text-neutral-400 font-normal">(IP Whitelist / CIDR)</span>
-                        </label>
-                        <div className="relative">
-                          <Globe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                          <input
-                            type="text"
-                            value={formAllowedIps}
-                            onChange={(e) => setFormAllowedIps(e.target.value)}
-                            placeholder="e.g. 192.168.1.1, 10.0.0.0/24 (Leave blank to allow all IPs)"
-                            className="w-full h-10 pl-9 pr-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Internal Notes */}
-                      <div className="space-y-1 md:col-span-2">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                          Internal Notes
-                        </label>
-                        <textarea
-                          value={formNotes}
-                          onChange={(e) => setFormNotes(e.target.value)}
-                          placeholder="Architectural or internal ticketing reference numbers..."
-                          rows={2}
-                          className="w-full p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs resize-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

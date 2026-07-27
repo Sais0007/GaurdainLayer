@@ -303,16 +303,11 @@ export default function OrganizationManagement() {
   const [isSettingsEditMode, setIsSettingsEditMode] = useState(false);
   const [settingsFormName, setSettingsFormName] = useState("");
   const [settingsFormDescription, setSettingsFormDescription] = useState("");
-  const [settingsFormModels, setSettingsFormModels] = useState<string[]>([]);
-  const [settingsAllModels, setSettingsAllModels] = useState(false);
   const [settingsMaxBudget, setSettingsMaxBudget] = useState("5000");
   const [settingsSoftBudget, setSettingsSoftBudget] = useState("4000");
   const [settingsResetCycle, setSettingsResetCycle] = useState<OrganizationItem["resetCycle"]>("Monthly");
   const [settingsTpmLimit, setSettingsTpmLimit] = useState("500000");
   const [settingsRpmLimit, setSettingsRpmLimit] = useState("5000");
-  const [settingsVectorStores, setSettingsVectorStores] = useState<string[]>([]);
-  const [settingsMcpServers, setSettingsMcpServers] = useState<string[]>([]);
-  const [settingsMetadata, setSettingsMetadata] = useState("");
   const [settingsFormTouched, setSettingsFormTouched] = useState(false);
 
   // Search & Filter State
@@ -345,7 +340,6 @@ export default function OrganizationManagement() {
     { key: "name", label: "Organization Name" },
     { key: "createdDate", label: "Created Date" },
     { key: "currentSpend", label: "Spend / Budget" },
-    { key: "assignedModels", label: "Assigned Models" },
     { key: "rateLimits", label: "Rate Limits" },
     { key: "membersCount", label: "Members" },
     { key: "status", label: "Status" },
@@ -355,7 +349,6 @@ export default function OrganizationManagement() {
     name: true,
     createdDate: true,
     currentSpend: true,
-    assignedModels: true,
     rateLimits: true,
     membersCount: true,
     status: true,
@@ -376,19 +369,6 @@ export default function OrganizationManagement() {
   // Form State for Enterprise Create Organization Modal
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formModels, setFormModels] = useState<string[]>(["gpt-4o", "claude-3-5-sonnet"]);
-  const [allModelsSelected, setAllModelsSelected] = useState(false);
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const [modelSearchQuery, setModelSearchQuery] = useState("");
-  
-  const [formMaxBudget, setFormMaxBudget] = useState("5000");
-  const [formResetCycle, setFormResetCycle] = useState<OrganizationItem["resetCycle"]>("Monthly");
-  const [formTpmLimit, setFormTpmLimit] = useState("500000");
-  const [formRpmLimit, setFormRpmLimit] = useState("5000");
-  
-  const [formVectorStores, setFormVectorStores] = useState<string[]>([]);
-  const [formMcpServers, setFormMcpServers] = useState<string[]>([]);
-  const [formMetadata, setFormMetadata] = useState('{\n  "environment": "production"\n}');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
@@ -594,16 +574,11 @@ export default function OrganizationManagement() {
     if (!selectedOrg) return;
     setSettingsFormName(selectedOrg.name);
     setSettingsFormDescription(selectedOrg.description || "");
-    setSettingsFormModels(selectedOrg.assignedModels);
-    setSettingsAllModels(selectedOrg.assignedModels.includes("All Models"));
     setSettingsMaxBudget(selectedOrg.maxBudget.toString());
     setSettingsSoftBudget((selectedOrg.maxBudget * 0.8).toString());
     setSettingsResetCycle(selectedOrg.resetCycle);
     setSettingsTpmLimit(selectedOrg.tpmLimit.toString());
     setSettingsRpmLimit(selectedOrg.rpmLimit.toString());
-    setSettingsVectorStores(selectedOrg.vectorStores || []);
-    setSettingsMcpServers(selectedOrg.mcpServers || []);
-    setSettingsMetadata(selectedOrg.metadata || "");
     setSettingsFormTouched(false);
     setIsSettingsEditMode(true);
   };
@@ -619,14 +594,10 @@ export default function OrganizationManagement() {
       ...selectedOrg,
       name: settingsFormName.trim(),
       description: settingsFormDescription.trim(),
-      assignedModels: settingsAllModels ? ["All Models"] : (settingsFormModels.length > 0 ? settingsFormModels : ["gpt-4o"]),
       maxBudget: parseFloat(settingsMaxBudget) || 0,
       resetCycle: settingsResetCycle,
       tpmLimit: parseInt(settingsTpmLimit) || 500000,
       rpmLimit: parseInt(settingsRpmLimit) || 5000,
-      vectorStores: settingsVectorStores,
-      mcpServers: settingsMcpServers,
-      metadata: settingsMetadata,
     };
 
     setSelectedOrg(updatedOrg);
@@ -768,15 +739,6 @@ export default function OrganizationManagement() {
     setSelectedOrg(null);
     setFormName("");
     setFormDescription("");
-    setFormModels(["gpt-4o", "claude-3-5-sonnet"]);
-    setAllModelsSelected(false);
-    setFormMaxBudget("5000");
-    setFormResetCycle("Monthly");
-    setFormTpmLimit("500000");
-    setFormRpmLimit("5000");
-    setFormVectorStores([]);
-    setFormMcpServers([]);
-    setFormMetadata('{\n  "environment": "production"\n}');
     setFormTouched(false);
     setIsSubmitting(false);
     setShowCreateModal(true);
@@ -787,15 +749,6 @@ export default function OrganizationManagement() {
     setIsEditMode(true);
     setFormName(org.name);
     setFormDescription(org.description || "");
-    setFormModels(org.assignedModels);
-    setAllModelsSelected(org.assignedModels.includes("All Models"));
-    setFormMaxBudget(org.maxBudget.toString());
-    setFormResetCycle(org.resetCycle);
-    setFormTpmLimit(org.tpmLimit.toString());
-    setFormRpmLimit(org.rpmLimit.toString());
-    setFormVectorStores(org.vectorStores || []);
-    setFormMcpServers(org.mcpServers || []);
-    setFormMetadata(org.metadata || "");
     setFormTouched(false);
     setIsSubmitting(false);
     setShowCreateModal(true);
@@ -824,14 +777,6 @@ export default function OrganizationManagement() {
                   ...o,
                   name: formName.trim(),
                   description: formDescription.trim(),
-                  assignedModels: allModelsSelected ? ["All Models"] : (formModels.length > 0 ? formModels : ["gpt-4o"]),
-                  maxBudget: parseFloat(formMaxBudget) || 0,
-                  resetCycle: formResetCycle,
-                  tpmLimit: parseInt(formTpmLimit) || 500000,
-                  rpmLimit: parseInt(formRpmLimit) || 5000,
-                  vectorStores: formVectorStores,
-                  mcpServers: formMcpServers,
-                  metadata: formMetadata,
                 }
               : o
           )
@@ -847,16 +792,13 @@ export default function OrganizationManagement() {
           description: formDescription.trim(),
           createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
           currentSpend: 0,
-          maxBudget: parseFloat(formMaxBudget) || 5000,
-          resetCycle: formResetCycle,
-          assignedModels: allModelsSelected ? ["All Models"] : (formModels.length > 0 ? formModels : ["gpt-4o"]),
-          tpmLimit: parseInt(formTpmLimit) || 500000,
-          rpmLimit: parseInt(formRpmLimit) || 5000,
+          maxBudget: 5000,
+          resetCycle: "Monthly",
+          assignedModels: ["All Models"],
+          tpmLimit: 500000,
+          rpmLimit: 5000,
           membersCount: 1,
           status: "Active",
-          vectorStores: formVectorStores,
-          mcpServers: formMcpServers,
-          metadata: formMetadata,
           createdBy: "hbadmin@yopmail.com",
         };
         setOrganizations((prev) => [newOrgItem, ...prev]);
@@ -1539,28 +1481,7 @@ export default function OrganizationManagement() {
                   </div>
                 </div>
 
-                {/* CARD 4 — ASSIGNED MODELS */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
-                  <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                    <Lock className="w-4 h-4 text-purple-600" />
-                    <h3 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Assigned Models ({selectedOrg.assignedModels.length})
-                    </h3>
-                  </div>
-                  {selectedOrg.assignedModels.length === 0 ? (
-                    <div className="py-4 text-center text-neutral-400 text-xs">No Models Configured</div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedOrg.assignedModels.map((m) => (
-                        <span key={m} className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 border border-neutral-200/60">
-                          {m}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* CARD 5 — TEAMS */}
+                {/* CARD 4 — TEAMS */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
                   <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                     <div className="flex items-center gap-2">
@@ -1584,69 +1505,6 @@ export default function OrganizationManagement() {
                     >
                       View All Teams →
                     </button>
-                  </div>
-                </div>
-
-                {/* CARD 6 — OBJECT PERMISSIONS SUMMARY */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5 lg:col-span-2">
-                  <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                    <Database className="w-4 h-4 text-indigo-600" />
-                    <h3 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Object Permissions Summary
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg space-y-1">
-                      <div className="text-neutral-400 text-[10px] font-semibold">Vector Stores</div>
-                      <div className="text-base font-bold text-neutral-900 dark:text-white">{selectedOrg.vectorStores?.length || 0} Configured</div>
-                    </div>
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg space-y-1">
-                      <div className="text-neutral-400 text-[10px] font-semibold">MCP Servers</div>
-                      <div className="text-base font-bold text-neutral-900 dark:text-white">{selectedOrg.mcpServers?.length || 0} Configured</div>
-                    </div>
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg space-y-1 opacity-70">
-                      <div className="text-neutral-400 text-[10px] font-semibold">AI Agents</div>
-                      <div className="text-base font-bold text-neutral-500">0 Configured</div>
-                    </div>
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg space-y-1 opacity-70">
-                      <div className="text-neutral-400 text-[10px] font-semibold">Search Tools</div>
-                      <div className="text-base font-bold text-neutral-500">0 Configured</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CARD 7 — METADATA & DESCRIPTION */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5 md:col-span-2 lg:col-span-3">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-neutral-500" />
-                      <h3 className="font-bold text-sm text-neutral-900 dark:text-white">
-                        Metadata Payload & Scope
-                      </h3>
-                    </div>
-                    <span className="text-neutral-400 text-[11px] font-mono">JSON</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <div className="font-semibold text-neutral-800 dark:text-neutral-200">Scope Description</div>
-                      <p className="text-neutral-600 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-950 p-3 rounded-lg border border-neutral-200/60 dark:border-neutral-800">
-                        {selectedOrg.description || "No description provided for this organization."}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="font-semibold text-neutral-800 dark:text-neutral-200">Custom Metadata</div>
-                      {selectedOrg.metadata && selectedOrg.metadata.trim() !== "" ? (
-                        <pre className="p-3 bg-neutral-900 text-emerald-400 rounded-lg font-mono text-[11px] overflow-x-auto">
-                          {selectedOrg.metadata}
-                        </pre>
-                      ) : (
-                        <div className="p-4 bg-neutral-50 dark:bg-neutral-950 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-lg text-center text-neutral-400 text-xs">
-                          No Metadata Available
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1966,31 +1824,7 @@ export default function OrganizationManagement() {
                       </div>
                     </div>
 
-                    {/* CARD 2 — MODELS CONFIGURATION */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
-                      <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                        <div className="flex items-center gap-2">
-                          <Lock className="w-4 h-4 text-purple-600" />
-                          <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Models Access</h4>
-                        </div>
-                        <span className="text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-200/50">
-                          {selectedOrg.assignedModels.includes("All Models") ? "All Models" : `${selectedOrg.assignedModels.length} Models`}
-                        </span>
-                      </div>
-                      {selectedOrg.assignedModels.length === 0 ? (
-                        <div className="py-6 text-center text-neutral-400">No Models Assigned</div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {selectedOrg.assignedModels.map((m) => (
-                            <span key={m} className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 border border-neutral-200/60">
-                              {m}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* CARD 3 — BUDGET CONFIGURATION */}
+                    {/* CARD 2 — BUDGET CONFIGURATION */}
                     <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
                       <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                         <div className="flex items-center gap-2">
@@ -2022,7 +1856,7 @@ export default function OrganizationManagement() {
                       </div>
                     </div>
 
-                    {/* CARD 4 — RATE LIMITS */}
+                    {/* CARD 3 — RATE LIMITS */}
                     <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
                       <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                         <ShieldCheck className="w-4 h-4 text-amber-600" />
@@ -2043,63 +1877,6 @@ export default function OrganizationManagement() {
                         </div>
                       </div>
                     </div>
-
-                    {/* CARD 5 — OBJECT PERMISSIONS SUMMARY */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5 lg:col-span-2">
-                      <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                        <Database className="w-4 h-4 text-indigo-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Object Permissions Configured</h4>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg">
-                          <div className="text-neutral-400 text-[10px] font-semibold">Vector Stores</div>
-                          <div className="text-sm font-bold text-neutral-900 dark:text-white mt-0.5">{selectedOrg.vectorStores?.length || 0} Attached</div>
-                        </div>
-                        <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg">
-                          <div className="text-neutral-400 text-[10px] font-semibold">MCP Servers</div>
-                          <div className="text-sm font-bold text-neutral-900 dark:text-white mt-0.5">{selectedOrg.mcpServers?.length || 0} Attached</div>
-                        </div>
-                        <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg opacity-70">
-                          <div className="text-neutral-400 text-[10px] font-semibold">Access Groups</div>
-                          <div className="text-sm font-bold text-neutral-500 mt-0.5">0 Configured</div>
-                        </div>
-                        <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg opacity-70">
-                          <div className="text-neutral-400 text-[10px] font-semibold">Search Tools</div>
-                          <div className="text-sm font-bold text-neutral-500 mt-0.5">0 Configured</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CARD 6 — METADATA PAYLOAD & SCOPE */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5 md:col-span-2 lg:col-span-3">
-                      <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-neutral-500" />
-                          <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Metadata & Scope Configuration</h4>
-                        </div>
-                        <span className="text-neutral-400 text-[11px] font-mono">JSON</span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <div className="font-semibold text-neutral-800 dark:text-neutral-200">Scope Description</div>
-                          <p className="p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-600 dark:text-neutral-400">
-                            {selectedOrg.description || "No description provided."}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono">Custom Metadata</div>
-                          {selectedOrg.metadata && selectedOrg.metadata.trim() !== "" ? (
-                            <pre className="p-3 bg-neutral-900 text-emerald-400 rounded-lg font-mono text-[11px] overflow-x-auto">
-                              {selectedOrg.metadata}
-                            </pre>
-                          ) : (
-                            <div className="p-4 bg-neutral-50 dark:bg-neutral-950 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-lg text-center text-neutral-400">
-                              No Metadata Available
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 ) : (
                   /* INLINE EDIT MODE FORM LAYOUT */
@@ -2108,7 +1885,7 @@ export default function OrganizationManagement() {
                     <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                       <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                         <Building2 className="w-4 h-4 text-primary-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Section 1 — Basic Information</h4>
+                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Basic Information</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1 md:col-span-2">
@@ -2137,55 +1914,11 @@ export default function OrganizationManagement() {
                       </div>
                     </div>
 
-                    {/* Section 2 — Models */}
-                    <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <div className="flex items-center gap-2">
-                          <Lock className="w-4 h-4 text-primary-600" />
-                          <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Section 2 — Model Access</h4>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSettingsAllModels(!settingsAllModels)}
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
-                            settingsAllModels ? "bg-primary-600 text-white" : "bg-neutral-200 text-neutral-700 hover:bg-neutral-300"
-                          }`}
-                        >
-                          {settingsAllModels ? "All Models Permitted" : "Allow All Models"}
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {AVAILABLE_MODELS.map((m) => {
-                          const isSelected = settingsFormModels.includes(m.id) || settingsAllModels;
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => {
-                                if (settingsAllModels) setSettingsAllModels(false);
-                                setSettingsFormModels((prev) =>
-                                  prev.includes(m.id) ? prev.filter((id) => id !== m.id) : [...prev, m.id]
-                                );
-                              }}
-                              className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
-                                isSelected
-                                  ? "bg-primary-50 dark:bg-primary-950/60 border-primary-500 text-primary-700 dark:text-primary-300 font-semibold"
-                                  : "bg-white dark:bg-neutral-950 border-neutral-200 text-neutral-600"
-                              }`}
-                            >
-                              <span>{m.name}</span>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-primary-600" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Section 3 — Budget */}
+                    {/* Section 2 — Budget */}
                     <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                       <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                         <BarChart3 className="w-4 h-4 text-emerald-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Section 3 — Budget Configuration</h4>
+                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Budget Configuration</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
@@ -2224,11 +1957,11 @@ export default function OrganizationManagement() {
                       </div>
                     </div>
 
-                    {/* Section 4 — Rate Limits */}
+                    {/* Section 3 — Rate Limits */}
                     <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                       <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                         <ShieldCheck className="w-4 h-4 text-amber-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Section 4 — Rate Limits</h4>
+                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Rate Limits</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -2250,20 +1983,6 @@ export default function OrganizationManagement() {
                           />
                         </div>
                       </div>
-                    </div>
-
-                    {/* Section 5 — Metadata */}
-                    <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <FileText className="w-4 h-4 text-neutral-500" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Section 5 — Metadata (JSON)</h4>
-                      </div>
-                      <textarea
-                        value={settingsMetadata}
-                        onChange={(e) => setSettingsMetadata(e.target.value)}
-                        rows={3}
-                        className="w-full p-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-[11px] resize-none"
-                      />
                     </div>
 
                     {/* Sticky Footer Bar */}
@@ -2327,7 +2046,7 @@ export default function OrganizationManagement() {
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Building2 className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 1 — Basic Information
+                    Basic Information
                   </h4>
                 </div>
 
@@ -2375,233 +2094,6 @@ export default function OrganizationManagement() {
                       className="w-full p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
                     />
                   </div>
-                </div>
-              </div>
-
-              {/* SECTION 2 — MODELS ACCESS */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <div className="flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Section 2 — Model Access
-                    </h4>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAllModelsSelected(!allModelsSelected);
-                        if (!allModelsSelected) {
-                          setFormModels(AVAILABLE_MODELS.map((m) => m.id));
-                        }
-                      }}
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors ${
-                        allModelsSelected ? "bg-primary-600 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300"
-                      }`}
-                    >
-                      {allModelsSelected ? "All Models Permitted" : "Allow All Models"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {AVAILABLE_MODELS.map((m) => {
-                      const isSelected = formModels.includes(m.id) || allModelsSelected;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            if (allModelsSelected) setAllModelsSelected(false);
-                            setFormModels((prev) =>
-                              prev.includes(m.id) ? prev.filter((id) => id !== m.id) : [...prev, m.id]
-                            );
-                          }}
-                          className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
-                            isSelected
-                              ? "bg-primary-50 dark:bg-primary-950/60 border-primary-500 text-primary-700 dark:text-primary-300 font-semibold"
-                              : "bg-white dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
-                          }`}
-                        >
-                          <span>{m.name}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-primary-600" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 3 — BUDGET & RESET CYCLE */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 3 — Budget & Reset Cycle
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Max Budget ($)
-                    </label>
-                    <input
-                      type="number"
-                      value={formMaxBudget}
-                      onChange={(e) => setFormMaxBudget(e.target.value)}
-                      placeholder="5000 (Enter 0 for Unlimited)"
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Budget Reset Cycle
-                    </label>
-                    <select
-                      value={formResetCycle}
-                      onChange={(e) => setFormResetCycle(e.target.value as any)}
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
-                    >
-                      <option value="Daily">Daily</option>
-                      <option value="Weekly">Weekly</option>
-                      <option value="Monthly">Monthly</option>
-                      <option value="Quarterly">Quarterly</option>
-                      <option value="Yearly">Yearly</option>
-                      <option value="Never">Never (One-time)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 4 — RATE LIMITS */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 4 — Rate Limits (TPM / RPM)
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Tokens Per Minute (TPM)
-                    </label>
-                    <input
-                      type="number"
-                      value={formTpmLimit}
-                      onChange={(e) => setFormTpmLimit(e.target.value)}
-                      placeholder="500000"
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Requests Per Minute (RPM)
-                    </label>
-                    <input
-                      type="number"
-                      value={formRpmLimit}
-                      onChange={(e) => setFormRpmLimit(e.target.value)}
-                      placeholder="5000"
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 5 — OBJECT PERMISSIONS */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <Database className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 5 — Object Permissions & Access Groups
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Vector Stores Access
-                    </label>
-                    <div className="flex flex-wrap gap-1.5 p-2 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg min-h-[40px]">
-                      {AVAILABLE_VECTOR_STORES.map((v) => {
-                        const isChecked = formVectorStores.includes(v);
-                        return (
-                          <button
-                            key={v}
-                            type="button"
-                            onClick={() =>
-                              setFormVectorStores((prev) =>
-                                prev.includes(v) ? prev.filter((item) => item !== v) : [...prev, v]
-                              )
-                            }
-                            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-                              isChecked
-                                ? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-300"
-                                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
-                            }`}
-                          >
-                            {v}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      MCP Servers Access
-                    </label>
-                    <div className="flex flex-wrap gap-1.5 p-2 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg min-h-[40px]">
-                      {AVAILABLE_MCP_SERVERS.map((m) => {
-                        const isChecked = formMcpServers.includes(m);
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() =>
-                              setFormMcpServers((prev) =>
-                                prev.includes(m) ? prev.filter((item) => item !== m) : [...prev, m]
-                              )
-                            }
-                            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-                              isChecked
-                                ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-300"
-                                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 6 — METADATA */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <FileText className="w-4 h-4 text-neutral-500" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 6 — Custom Metadata (JSON)
-                  </h4>
-                </div>
-
-                <div className="space-y-1">
-                  <textarea
-                    value={formMetadata}
-                    onChange={(e) => setFormMetadata(e.target.value)}
-                    placeholder='{\n  "key": "value"\n}'
-                    rows={4}
-                    className="w-full p-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-[11px] text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 transition-all resize-none"
-                  />
                 </div>
               </div>
             </div>
@@ -2804,12 +2296,12 @@ export default function OrganizationManagement() {
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs custom-scrollbar">
-              {/* SECTION 1 — USER SELECTION */}
+              {/* USER SELECTION */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-primary-600" />
-                    Section 1 — Select User
+                    Select User
                   </h4>
 
                   {/* Toggle between Email and User ID Lookup */}
@@ -2898,12 +2390,12 @@ export default function OrganizationManagement() {
                 </div>
               </div>
 
-              {/* SECTION 2 — ORGANIZATION ROLE */}
+              {/* ORGANIZATION ROLE */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Lock className="w-4 h-4 text-purple-600" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 2 — Organization Role
+                    Organization Role
                   </h4>
                 </div>
 

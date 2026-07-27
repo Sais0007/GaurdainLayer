@@ -352,15 +352,6 @@ export default function TeamsManagement() {
   const [formResetCycle, setFormResetCycle] = useState<"Monthly" | "Quarterly" | "Annual" | "Infinite">("Monthly");
   const [formTpmLimit, setFormTpmLimit] = useState("500000");
   const [formRpmLimit, setFormRpmLimit] = useState("5000");
-  const [formDefaultRole, setFormDefaultRole] = useState<"Team Admin" | "Developer" | "Viewer">("Developer");
-  const [formDefaultPermissions, setFormDefaultPermissions] = useState<string[]>([
-    "Create Virtual Keys",
-    "Access Models",
-  ]);
-  const [formVectorStores, setFormVectorStores] = useState<string[]>([]);
-  const [formMcpServers, setFormMcpServers] = useState<string[]>([]);
-  const [formMetadata, setFormMetadata] = useState("{}");
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [highlightedTeamId, setHighlightedTeamId] = useState<string | null>(null);
@@ -495,12 +486,6 @@ export default function TeamsManagement() {
     setFormResetCycle("Monthly");
     setFormTpmLimit("500000");
     setFormRpmLimit("5000");
-    setFormDefaultRole("Developer");
-    setFormDefaultPermissions(["Create Virtual Keys", "Access Models"]);
-    setFormVectorStores([]);
-    setFormMcpServers([]);
-    setFormMetadata("{}");
-    setShowAdvancedSettings(false);
     setFormTouched(false);
     setIsSubmitting(false);
     setShowCreateModal(true);
@@ -549,9 +534,9 @@ export default function TeamsManagement() {
         keysList: [],
         policies: ["Rate Limiting"],
         guardrails: ["PII Masking"],
-        vectorStores: formVectorStores,
+        vectorStores: [],
         searchTools: [],
-        mcpServers: formMcpServers,
+        mcpServers: [],
         agents: [],
         loggingIntegration: "Default HB LogStream",
         isPublic: false
@@ -1743,7 +1728,7 @@ export default function TeamsManagement() {
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Building2 className="w-4 h-4 text-primary-600" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 1 — Basic Information
+                    Basic Information
                   </h4>
                 </div>
 
@@ -1819,7 +1804,7 @@ export default function TeamsManagement() {
                   <div className="flex items-center gap-2">
                     <Lock className="w-4 h-4 text-purple-600" />
                     <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                      Section 2 — Model Access & Proxy Routing
+                      Model Access & Proxy Routing
                     </h4>
                   </div>
                   <button
@@ -1879,7 +1864,7 @@ export default function TeamsManagement() {
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 3 — Budget Configuration ($ USD)
+                    Budget Configuration ($ USD)
                   </h4>
                 </div>
 
@@ -1933,7 +1918,7 @@ export default function TeamsManagement() {
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 4 — Rate Limits (TPM / RPM)
+                    Rate Limits (TPM / RPM)
                   </h4>
                 </div>
 
@@ -1964,176 +1949,6 @@ export default function TeamsManagement() {
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* SECTION 5 — DEFAULT MEMBER CONFIGURATION */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <UserCheck className="w-4 h-4 text-blue-600" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 5 — Default Member Configuration
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Default Member Role
-                    </label>
-                    <select
-                      value={formDefaultRole}
-                      onChange={(e) => setFormDefaultRole(e.target.value as any)}
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
-                    >
-                      <option value="Developer">Developer</option>
-                      <option value="Team Admin">Team Admin</option>
-                      <option value="Viewer">Viewer</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Default Member Permissions
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {[
-                        "Create Virtual Keys",
-                        "Manage Team Members",
-                        "Manage Budgets",
-                        "View Reports",
-                        "Access Models",
-                      ].map((perm) => {
-                        const checked = formDefaultPermissions.includes(perm);
-                        return (
-                          <label key={perm} className="flex items-center gap-2 p-2 bg-white dark:bg-neutral-950 border rounded-lg cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                setFormDefaultPermissions((prev) =>
-                                  e.target.checked ? [...prev, perm] : prev.filter((p) => p !== perm)
-                                );
-                              }}
-                              className="w-4 h-4 text-primary-600 rounded"
-                            />
-                            <span className="font-medium text-neutral-800 dark:text-neutral-200">{perm}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 6 — OBJECT PERMISSIONS */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <Database className="w-4 h-4 text-indigo-600" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 6 — Object Permissions & Resources
-                  </h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Vector Stores
-                    </label>
-                    <div className="flex flex-wrap gap-2 p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg min-h-[44px]">
-                      {["vector-store-prod-01", "knowledge-base-hb"].map((vs) => {
-                        const checked = formVectorStores.includes(vs);
-                        return (
-                          <button
-                            key={vs}
-                            type="button"
-                            onClick={() =>
-                              setFormVectorStores((prev) =>
-                                prev.includes(vs) ? prev.filter((x) => x !== vs) : [...prev, vs]
-                              )
-                            }
-                            className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold flex items-center gap-1 ${
-                              checked ? "bg-indigo-100 text-indigo-800 border border-indigo-300" : "bg-neutral-100 text-neutral-600"
-                            }`}
-                          >
-                            <span>{vs}</span>
-                            {checked && <Check className="w-3 h-3" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      MCP Servers
-                    </label>
-                    <div className="flex flex-wrap gap-2 p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg min-h-[44px]">
-                      {["mcp-auth-gateway", "mcp-db-connector"].map((mcp) => {
-                        const checked = formMcpServers.includes(mcp);
-                        return (
-                          <button
-                            key={mcp}
-                            type="button"
-                            onClick={() =>
-                              setFormMcpServers((prev) =>
-                                prev.includes(mcp) ? prev.filter((x) => x !== mcp) : [...prev, mcp]
-                              )
-                            }
-                            className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold flex items-center gap-1 ${
-                              checked ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-neutral-100 text-neutral-600"
-                            }`}
-                          >
-                            <span>{mcp}</span>
-                            {checked && <Check className="w-3 h-3" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 7 — METADATA */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <FileText className="w-4 h-4 text-neutral-500" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Section 7 — Custom Metadata (JSON)
-                  </h4>
-                </div>
-                <textarea
-                  rows={2}
-                  value={formMetadata}
-                  onChange={(e) => setFormMetadata(e.target.value)}
-                  placeholder="{}"
-                  className="w-full p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-[11px] resize-none"
-                />
-              </div>
-
-              {/* SECTION 8 — ADVANCED SETTINGS ACCORDION */}
-              <div className="border border-neutral-200/80 dark:border-neutral-800 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                  className="w-full p-4 bg-neutral-100/60 dark:bg-neutral-800/60 hover:bg-neutral-200/60 font-bold text-left flex items-center justify-between transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <SettingsIcon className="w-4 h-4 text-neutral-500" />
-                    Section 8 — Advanced Settings & Reserved Configurations
-                  </span>
-                  {showAdvancedSettings ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                </button>
-
-                {showAdvancedSettings && (
-                  <div className="p-4 bg-white dark:bg-neutral-900 space-y-3 border-t">
-                    <p className="text-neutral-500 text-[11px]">
-                      Advanced fallback policies, custom proxy headers, and reserved team parameters.
-                    </p>
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-950 rounded-lg border font-mono text-[11px]">
-                      proxy_pass: "https://gateway.spinecloudiq.com/v1/teams"
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
