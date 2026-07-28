@@ -27,7 +27,12 @@ import {
   Lock, 
   FileText, 
   Database,
-  Server
+  Server,
+  LogIn,
+  Upload,
+  FileSpreadsheet,
+  Globe,
+  UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -40,6 +45,18 @@ import {
   type ColumnConfig
 } from "./hb/listing";
 
+// --- Dependent Country & State Master Data ---
+export const COUNTRIES_AND_STATES: Record<string, string[]> = {
+  "United States": ["California", "New York", "Texas", "Florida", "Illinois", "Washington", "Massachusetts"],
+  "United Kingdom": ["England", "Scotland", "Wales", "Northern Ireland"],
+  "Germany": ["Bavaria", "Berlin", "Baden-Württemberg", "North Rhine-Westphalia", "Hesse"],
+  "Canada": ["Ontario", "Quebec", "British Columbia", "Alberta"],
+  "Australia": ["New South Wales", "Victoria", "Queensland", "Western Australia"],
+  "India": ["Maharashtra", "Karnataka", "Delhi", "Tamil Nadu", "Telangana"],
+  "Japan": ["Tokyo", "Osaka", "Kanagawa", "Aichi"],
+  "Singapore": ["Central Region", "North-East Region", "East Region", "West Region"]
+};
+
 // --- Organization Data Interface ---
 export interface OrganizationItem {
   id: string;
@@ -50,9 +67,18 @@ export interface OrganizationItem {
   currentSpend: number;
   maxBudget: number; // 0 for unlimited
   resetCycle: "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly" | "Never";
+  modelSelectionType?: "all" | "selected";
   assignedModels: string[];
   tpmLimit: number;
   rpmLimit: number;
+  country?: string;
+  state?: string;
+  city?: string;
+  zipCode?: string;
+  phone?: string;
+  primaryAdminName?: string;
+  primaryAdminEmail?: string;
+  primaryAdminPhone?: string;
   membersCount: number;
   status: "Active" | "Inactive" | "Suspended";
   vectorStores?: string[];
@@ -69,12 +95,21 @@ const mockOrganizations: OrganizationItem[] = [
     name: "HB Enterprise",
     description: "Primary enterprise organization for core platform services and internal AI apps",
     createdDate: "Jul 15, 2026",
-    currentSpend: 3420.50,
-    maxBudget: 10000,
+    currentSpend: 18452.90,
+    maxBudget: 25000,
     resetCycle: "Monthly",
-    assignedModels: ["gpt-4o", "claude-3-5-sonnet", "gemini-1-5-pro", "llama-3-70b"],
+    modelSelectionType: "selected",
+    assignedModels: ["GPT-4.1", "Claude 3.5 Sonnet", "Gemini 1.5 Pro", "Llama 3 70B"],
     tpmLimit: 1000000,
     rpmLimit: 10000,
+    country: "United States",
+    state: "California",
+    city: "San Francisco",
+    zipCode: "94105",
+    phone: "+1 (415) 555-0192",
+    primaryAdminName: "John Doe",
+    primaryAdminEmail: "superadmin@spinecloudiq.com",
+    primaryAdminPhone: "+1 (415) 555-0199",
     membersCount: 42,
     status: "Active",
     vectorStores: ["vector-store-prod-01", "knowledge-base-hb"],
@@ -91,9 +126,17 @@ const mockOrganizations: OrganizationItem[] = [
     currentSpend: 1850.00,
     maxBudget: 5000,
     resetCycle: "Monthly",
-    assignedModels: ["gpt-4o", "claude-3-5-sonnet", "codex-mini-latest"],
+    modelSelectionType: "selected",
+    assignedModels: ["GPT-4o", "Claude 3.5 Sonnet", "Codex Mini"],
     tpmLimit: 500000,
     rpmLimit: 5000,
+    country: "United States",
+    state: "Washington",
+    city: "Seattle",
+    zipCode: "98101",
+    phone: "+1 (206) 555-0143",
+    primaryAdminName: "HB Admin",
+    primaryAdminEmail: "hbadmin@yopmail.com",
     membersCount: 18,
     status: "Active",
     vectorStores: ["vector-store-devops"],
@@ -110,9 +153,17 @@ const mockOrganizations: OrganizationItem[] = [
     currentSpend: 890.25,
     maxBudget: 2500,
     resetCycle: "Monthly",
-    assignedModels: ["claude-3-5-sonnet", "mistral-large"],
+    modelSelectionType: "selected",
+    assignedModels: ["Claude 3.5 Sonnet", "Mistral Large"],
     tpmLimit: 250000,
     rpmLimit: 2500,
+    country: "United Kingdom",
+    state: "England",
+    city: "London",
+    zipCode: "EC2N 2DB",
+    phone: "+44 20 7946 0912",
+    primaryAdminName: "Sarah Connor",
+    primaryAdminEmail: "sarah.connor@hb.com",
     membersCount: 12,
     status: "Active",
     vectorStores: ["sec-threat-vault"],
@@ -129,9 +180,17 @@ const mockOrganizations: OrganizationItem[] = [
     currentSpend: 0.00,
     maxBudget: 0, // Unlimited
     resetCycle: "Never",
+    modelSelectionType: "all",
     assignedModels: ["All Models"],
     tpmLimit: 2000000,
     rpmLimit: 20000,
+    country: "Germany",
+    state: "Bavaria",
+    city: "Munich",
+    zipCode: "80331",
+    phone: "+49 89 2018 4400",
+    primaryAdminName: "Alex Dev",
+    primaryAdminEmail: "alex.dev@hb.com",
     membersCount: 8,
     status: "Inactive",
     vectorStores: [],
@@ -148,9 +207,17 @@ const mockOrganizations: OrganizationItem[] = [
     currentSpend: 4200.00,
     maxBudget: 4000,
     resetCycle: "Monthly",
-    assignedModels: ["gpt-4o", "gemini-1-5-pro"],
+    modelSelectionType: "selected",
+    assignedModels: ["GPT-4o", "Gemini 1.5 Pro"],
     tpmLimit: 300000,
     rpmLimit: 3000,
+    country: "Canada",
+    state: "Ontario",
+    city: "Toronto",
+    zipCode: "M5V 2T6",
+    phone: "+1 (416) 555-0177",
+    primaryAdminName: "Michael Scott",
+    primaryAdminEmail: "michael.scott@hb.com",
     membersCount: 15,
     status: "Suspended",
     vectorStores: ["clinical-trials-v1"],
@@ -161,27 +228,13 @@ const mockOrganizations: OrganizationItem[] = [
 ];
 
 const AVAILABLE_MODELS = [
-  { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", badge: "Flagship" },
+  { id: "gpt-4.1", name: "GPT-4.1", provider: "OpenAI", badge: "Flagship" },
+  { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", badge: "Multimodal" },
   { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic", badge: "Reasoning" },
-  { id: "gemini-1-5-pro", name: "Gemini 1.5 Pro", provider: "Google", badge: "Multimodal" },
+  { id: "gemini-1-5-pro", name: "Gemini 1.5 Pro", provider: "Google", badge: "1M Context" },
   { id: "llama-3-70b", name: "Llama 3 70B", provider: "Meta", badge: "Open Source" },
   { id: "codex-mini-latest", name: "Codex", provider: "OpenAI", badge: "Code" },
   { id: "mistral-large", name: "Mistral Large", provider: "Mistral", badge: "Fast" },
-];
-
-const AVAILABLE_VECTOR_STORES = [
-  "vector-store-prod-01",
-  "knowledge-base-hb",
-  "vector-store-devops",
-  "sec-threat-vault",
-  "clinical-trials-v1"
-];
-
-const AVAILABLE_MCP_SERVERS = [
-  "mcp-auth-gateway",
-  "mcp-db-connector",
-  "mcp-k8s-agent",
-  "mcp-siem-bridge"
 ];
 
 export interface OrgMemberItem {
@@ -299,6 +352,7 @@ export default function OrganizationManagement() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedMemberRole, setSelectedMemberRole] = useState<OrgMemberItem["role"]>("Internal User");
   const [memberFormTouched, setMemberFormTouched] = useState(false);
+
   // Settings Tab Inline Edit State
   const [isSettingsEditMode, setIsSettingsEditMode] = useState(false);
   const [settingsFormName, setSettingsFormName] = useState("");
@@ -308,7 +362,6 @@ export default function OrganizationManagement() {
   const [settingsResetCycle, setSettingsResetCycle] = useState<OrganizationItem["resetCycle"]>("Monthly");
   const [settingsTpmLimit, setSettingsTpmLimit] = useState("500000");
   const [settingsRpmLimit, setSettingsRpmLimit] = useState("5000");
-  const [settingsFormTouched, setSettingsFormTouched] = useState(false);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -337,21 +390,29 @@ export default function OrganizationManagement() {
   const columnAnchorRef = useRef<HTMLDivElement>(null);
 
   const allColumns: ColumnConfig[] = [
+    { key: "orgId", label: "Organization ID" },
     { key: "name", label: "Organization Name" },
     { key: "createdDate", label: "Created Date" },
-    { key: "currentSpend", label: "Spend / Budget" },
-    { key: "rateLimits", label: "Rate Limits" },
-    { key: "membersCount", label: "Members" },
+    { key: "currentSpend", label: "Lifetime Spend (USD)" },
+    { key: "assignedModels", label: "Models" },
+    { key: "tpmLimit", label: "TPM Limit" },
+    { key: "rpmLimit", label: "RPM Limit" },
+    { key: "country", label: "Country" },
     { key: "status", label: "Status" },
+    { key: "membersCount", label: "Members" },
   ];
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    orgId: true,
     name: true,
     createdDate: true,
     currentSpend: true,
-    rateLimits: true,
-    membersCount: true,
+    assignedModels: true,
+    tpmLimit: true,
+    rpmLimit: true,
+    country: true,
     status: true,
+    membersCount: true,
   });
 
   const toggleColumn = (key: string) => {
@@ -364,17 +425,35 @@ export default function OrganizationManagement() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showLoginAsModal, setShowLoginAsModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [highlightedOrgId, setHighlightedOrgId] = useState<string | null>(null);
 
-  // Form State for Enterprise Create Organization Modal
+  // Extended Form State for Create / Edit Organization Modal
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formModelSelectionType, setFormModelSelectionType] = useState<"all" | "selected">("all");
+  const [formSelectedModels, setFormSelectedModels] = useState<string[]>([]);
+  const [formCountry, setFormCountry] = useState("United States");
+  const [formState, setFormState] = useState("California");
+  const [formCity, setFormCity] = useState("");
+  const [formZipCode, setFormZipCode] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formAdminName, setFormAdminName] = useState("");
+  const [formAdminEmail, setFormAdminEmail] = useState("");
+  const [formAdminPhone, setFormAdminPhone] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
 
+  // Bulk Import Wizard State
+  const [importStep, setImportStep] = useState<1 | 2 | 3 | 4>(1);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResults, setImportResults] = useState<{ success: number; failed: number; skipped: number } | null>(null);
+
   // Detail View Tab
-  const [detailTab, setDetailTab] = useState<"overview" | "members" | "models" | "permissions">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "members" | "settings">("overview");
 
   // Copy helper
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -395,6 +474,14 @@ export default function OrganizationManagement() {
     return () => window.removeEventListener("reset-view-state", handleReset);
   }, []);
 
+  // Update dependent state when country changes in form
+  useEffect(() => {
+    const availableStates = COUNTRIES_AND_STATES[formCountry] || [];
+    if (availableStates.length > 0 && !availableStates.includes(formState)) {
+      setFormState(availableStates[0]);
+    }
+  }, [formCountry]);
+
   // Validation calculations
   const isDuplicateName = useMemo(() => {
     if (!formName.trim()) return false;
@@ -409,9 +496,11 @@ export default function OrganizationManagement() {
     return (
       formName.trim().length > 0 &&
       formName.length <= 100 &&
-      !isDuplicateName
+      !isDuplicateName &&
+      formAdminName.trim().length > 0 &&
+      formAdminEmail.trim().length > 0
     );
-  }, [formName, isDuplicateName]);
+  }, [formName, isDuplicateName, formAdminName, formAdminEmail]);
 
   // Derived Members for Selected Organization
   const currentOrgMembers = useMemo(() => {
@@ -522,7 +611,6 @@ export default function OrganizationManagement() {
       [selectedOrg.id]: [newMember, ...(prev[selectedOrg.id] || [])],
     }));
 
-    // Update membersCount on organization
     setOrganizations((prev) =>
       prev.map((o) =>
         o.id === selectedOrg.id ? { ...o, membersCount: o.membersCount + 1 } : o
@@ -565,11 +653,7 @@ export default function OrganizationManagement() {
     setShowRemoveMemberModal(false);
   };
 
-  const handleResendInvitation = (member: OrgMemberItem) => {
-    toast.success(`Invitation re-sent to ${member.email}`);
-  };
-
-  // Settings Tab Inline Edit Handlers
+  // Settings Tab Handlers
   const handleStartInlineSettingsEdit = () => {
     if (!selectedOrg) return;
     setSettingsFormName(selectedOrg.name);
@@ -579,12 +663,10 @@ export default function OrganizationManagement() {
     setSettingsResetCycle(selectedOrg.resetCycle);
     setSettingsTpmLimit(selectedOrg.tpmLimit.toString());
     setSettingsRpmLimit(selectedOrg.rpmLimit.toString());
-    setSettingsFormTouched(false);
     setIsSettingsEditMode(true);
   };
 
   const handleSaveInlineSettings = () => {
-    setSettingsFormTouched(true);
     if (!selectedOrg || !settingsFormName.trim()) {
       toast.error("Organization Name is required.");
       return;
@@ -603,10 +685,6 @@ export default function OrganizationManagement() {
     setSelectedOrg(updatedOrg);
     setOrganizations((prev) => prev.map((o) => (o.id === selectedOrg.id ? updatedOrg : o)));
     toast.success(`Settings for "${updatedOrg.name}" updated successfully!`);
-    setIsSettingsEditMode(false);
-  };
-
-  const handleCancelInlineSettings = () => {
     setIsSettingsEditMode(false);
   };
 
@@ -739,6 +817,16 @@ export default function OrganizationManagement() {
     setSelectedOrg(null);
     setFormName("");
     setFormDescription("");
+    setFormModelSelectionType("all");
+    setFormSelectedModels([]);
+    setFormCountry("United States");
+    setFormState("California");
+    setFormCity("");
+    setFormZipCode("");
+    setFormPhone("");
+    setFormAdminName("");
+    setFormAdminEmail("");
+    setFormAdminPhone("");
     setFormTouched(false);
     setIsSubmitting(false);
     setShowCreateModal(true);
@@ -749,6 +837,16 @@ export default function OrganizationManagement() {
     setIsEditMode(true);
     setFormName(org.name);
     setFormDescription(org.description || "");
+    setFormModelSelectionType(org.modelSelectionType || "selected");
+    setFormSelectedModels(org.assignedModels.includes("All Models") ? [] : org.assignedModels);
+    setFormCountry(org.country || "United States");
+    setFormState(org.state || "California");
+    setFormCity(org.city || "");
+    setFormZipCode(org.zipCode || "");
+    setFormPhone(org.phone || "");
+    setFormAdminName(org.primaryAdminName || "John Doe");
+    setFormAdminEmail(org.primaryAdminEmail || "admin@company.com");
+    setFormAdminPhone(org.primaryAdminPhone || "");
     setFormTouched(false);
     setIsSubmitting(false);
     setShowCreateModal(true);
@@ -756,71 +854,105 @@ export default function OrganizationManagement() {
 
   const handleSaveOrganization = () => {
     setFormTouched(true);
-
-    if (!isFormValid) {
-      if (isDuplicateName) {
-        toast.error("An Organization with this name already exists.");
-      } else {
-        toast.error("Please fill in all required fields.");
-      }
-      return;
-    }
+    if (!isFormValid) return;
 
     setIsSubmitting(true);
-
     setTimeout(() => {
+      const finalModels = formModelSelectionType === "all" ? ["All Models"] : (formSelectedModels.length > 0 ? formSelectedModels : ["GPT-4o"]);
+
       if (isEditMode && selectedOrg) {
+        const updatedOrg: OrganizationItem = {
+          ...selectedOrg,
+          name: formName.trim(),
+          description: formDescription.trim(),
+          modelSelectionType: formModelSelectionType,
+          assignedModels: finalModels,
+          country: formCountry,
+          state: formState,
+          city: formCity,
+          zipCode: formZipCode,
+          phone: formPhone,
+          primaryAdminName: formAdminName,
+          primaryAdminEmail: formAdminEmail,
+          primaryAdminPhone: formAdminPhone,
+        };
+
         setOrganizations((prev) =>
-          prev.map((o) =>
-            o.id === selectedOrg.id
-              ? {
-                  ...o,
-                  name: formName.trim(),
-                  description: formDescription.trim(),
-                }
-              : o
-          )
+          prev.map((o) => (o.id === selectedOrg.id ? updatedOrg : o))
         );
+        setSelectedOrg(updatedOrg);
         toast.success(`Organization "${formName.trim()}" updated successfully!`);
-        setHighlightedOrgId(selectedOrg.id);
       } else {
-        const newId = `org-${Date.now()}`;
-        const newOrgItem: OrganizationItem = {
-          id: newId,
-          orgId: `org-${Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+        const newOrgId = `org-${Math.random().toString(36).substring(2, 10)}`;
+        const newOrg: OrganizationItem = {
+          id: `org-${Date.now()}`,
+          orgId: newOrgId,
           name: formName.trim(),
           description: formDescription.trim(),
           createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          currentSpend: 0,
+          currentSpend: 0.0,
           maxBudget: 5000,
           resetCycle: "Monthly",
-          assignedModels: ["All Models"],
+          modelSelectionType: formModelSelectionType,
+          assignedModels: finalModels,
           tpmLimit: 500000,
           rpmLimit: 5000,
+          country: formCountry,
+          state: formState,
+          city: formCity,
+          zipCode: formZipCode,
+          phone: formPhone,
+          primaryAdminName: formAdminName,
+          primaryAdminEmail: formAdminEmail,
+          primaryAdminPhone: formAdminPhone,
           membersCount: 1,
           status: "Active",
-          createdBy: "hbadmin@yopmail.com",
+          createdBy: "superadmin@spinecloudiq.com",
         };
-        setOrganizations((prev) => [newOrgItem, ...prev]);
-        toast.success(`Organization "${formName.trim()}" created successfully!`);
-        setHighlightedOrgId(newId);
+
+        setOrganizations((prev) => [newOrg, ...prev]);
+
+        // Add initial primary admin member
+        const newMember: OrgMemberItem = {
+          id: `mem-${Date.now()}`,
+          userId: `usr-${Math.random().toString(36).substring(2, 7)}`,
+          name: formAdminName.trim(),
+          email: formAdminEmail.trim(),
+          role: "Organization Admin",
+          currentSpend: 0,
+          joinedDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+          status: "Active",
+        };
+        setMembersMap((prev) => ({ ...prev, [newOrg.id]: [newMember] }));
+
+        setHighlightedOrgId(newOrg.id);
+        toast.success(`Organization "${newOrg.name}" created successfully! Verification email sent to ${formAdminEmail}.`);
+        setTimeout(() => setHighlightedOrgId(null), 3000);
       }
 
       setIsSubmitting(false);
       setShowCreateModal(false);
-
-      setTimeout(() => {
-        setHighlightedOrgId(null);
-      }, 4000);
-    }, 600);
+    }, 400);
   };
 
-  const handleDeleteOrgSubmit = () => {
+  const handleToggleStatusConfirm = () => {
     if (!selectedOrg) return;
+    const nextStatus = selectedOrg.status === "Active" ? "Inactive" : "Active";
+    const updated = { ...selectedOrg, status: nextStatus as OrganizationItem["status"] };
+    setSelectedOrg(updated);
+    setOrganizations(prev => prev.map(o => o.id === selectedOrg.id ? updated : o));
+    toast.success(`Organization status changed to ${nextStatus}.`);
+    setShowStatusModal(false);
+  };
+
+  const handleDeleteOrganization = () => {
+    if (!selectedOrg) return;
+
     setOrganizations((prev) => prev.filter((o) => o.id !== selectedOrg.id));
-    toast.success(`Organization "${selectedOrg.name}" deleted permanently.`);
+    toast.success(`Organization "${selectedOrg.name}" has been soft deleted.`);
     setShowDeleteModal(false);
-    if (viewState === "detail") setViewState("list");
+    setSelectedOrg(null);
+    setViewState("list");
   };
 
   const getBadgeStyle = (status: OrganizationItem["status"]) => {
@@ -910,7 +1042,20 @@ export default function OrganizationManagement() {
               title={showSummary ? "Hide Summary Cards" : "Show Summary Cards"}
             />
 
-            {/* 7. Create Organization Primary Button (Last Position) */}
+            {/* 7. Bulk Import Icon Button */}
+            <IconButton
+              icon={Upload}
+              label="Bulk Import"
+              onClick={() => {
+                setImportStep(1);
+                setImportFile(null);
+                setImportResults(null);
+                setShowBulkImportModal(true);
+              }}
+              title="Bulk Import Organizations"
+            />
+
+            {/* 8. Create Organization Primary Button (Last Position) */}
             <PrimaryButton icon={Plus} onClick={handleOpenCreateModal}>
               Create Organization
             </PrimaryButton>
@@ -953,6 +1098,8 @@ export default function OrganizationManagement() {
                       />
                     </th>
 
+                    {visibleColumns.orgId && <th className="py-3 px-4">Organization ID</th>}
+
                     {visibleColumns.name && (
                       <th 
                         onClick={() => handleSort("name")} 
@@ -966,11 +1113,13 @@ export default function OrganizationManagement() {
                     )}
 
                     {visibleColumns.createdDate && <th className="py-3 px-4">Created Date</th>}
-                    {visibleColumns.currentSpend && <th className="py-3 px-4">Spend / Budget</th>}
-                    {visibleColumns.assignedModels && <th className="py-3 px-4">Assigned Models</th>}
-                    {visibleColumns.rateLimits && <th className="py-3 px-4">Rate Limits (TPM/RPM)</th>}
-                    {visibleColumns.membersCount && <th className="py-3 px-4">Members</th>}
+                    {visibleColumns.currentSpend && <th className="py-3 px-4 text-right">Lifetime Spend (USD)</th>}
+                    {visibleColumns.assignedModels && <th className="py-3 px-4">Models</th>}
+                    {visibleColumns.tpmLimit && <th className="py-3 px-4">TPM Limit</th>}
+                    {visibleColumns.rpmLimit && <th className="py-3 px-4">RPM Limit</th>}
+                    {visibleColumns.country && <th className="py-3 px-4">Country</th>}
                     {visibleColumns.status && <th className="py-3 px-4">Status</th>}
+                    {visibleColumns.membersCount && <th className="py-3 px-4 text-center">Members</th>}
 
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -978,7 +1127,7 @@ export default function OrganizationManagement() {
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 text-neutral-800 dark:text-neutral-200">
                   {paginatedOrgs.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-neutral-400 dark:text-neutral-500 space-y-3">
+                      <td colSpan={12} className="py-12 text-center text-neutral-400 dark:text-neutral-500 space-y-3">
                         <Building2 className="w-10 h-10 mx-auto text-neutral-300 dark:text-neutral-700 stroke-1" />
                         <div className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No Organizations Found</div>
                         <p className="text-xs max-w-sm mx-auto">No organizations match your search query or filter selection.</p>
@@ -992,7 +1141,6 @@ export default function OrganizationManagement() {
                       const isSelected = selectedIds.has(item.id);
                       const isMenuOpen = activeMenuId === item.id;
                       const isHighlighted = item.id === highlightedOrgId;
-                      const spendPercent = item.maxBudget > 0 ? Math.min(100, (item.currentSpend / item.maxBudget) * 100) : 0;
 
                       return (
                         <tr
@@ -1014,85 +1162,94 @@ export default function OrganizationManagement() {
                             />
                           </td>
 
-                          {/* Organization Name & ID Column */}
+                          {/* Organization ID Column */}
+                          {visibleColumns.orgId && (
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-neutral-500 whitespace-nowrap">
+                              <div className="flex items-center gap-1">
+                                <span>{item.orgId}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(item.orgId, "Copied Organization ID!")}
+                                  className="hover:text-primary-600 transition-colors p-0.5"
+                                  title="Copy Org ID"
+                                >
+                                  {copiedId === item.orgId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            </td>
+                          )}
+
+                          {/* Organization Name Column */}
                           {visibleColumns.name && (
                             <td className="py-3.5 px-4">
-                              <div className="space-y-0.5">
-                                <button
-                                  onClick={() => {
-                                    setSelectedOrg(item);
-                                    setViewState("detail");
-                                  }}
-                                  className="font-bold text-neutral-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 hover:underline transition-colors text-left block"
-                                >
-                                  {item.name}
-                                </button>
-                                <div className="flex items-center gap-1 font-mono text-[11px] text-neutral-400">
-                                  <span>{item.orgId}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyText(item.orgId, "Copied Organization ID!")}
-                                    className="hover:text-primary-600 transition-colors p-0.5"
-                                    title="Copy Org ID"
-                                  >
-                                    {copiedId === item.orgId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedOrg(item);
+                                  setViewState("detail");
+                                }}
+                                className="font-bold text-neutral-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 hover:underline transition-colors text-left block"
+                              >
+                                {item.name}
+                              </button>
                             </td>
                           )}
 
-                          {visibleColumns.createdDate && <td className="py-3.5 px-4 text-neutral-500">{item.createdDate}</td>}
+                          {visibleColumns.createdDate && <td className="py-3.5 px-4 text-neutral-500 whitespace-nowrap">{item.createdDate}</td>}
 
-                          {/* Spend / Budget Progress Column */}
+                          {/* Lifetime Spend (USD) Column (Right Aligned) */}
                           {visibleColumns.currentSpend && (
-                            <td className="py-3.5 px-4 min-w-[140px]">
-                              <div className="space-y-1 font-mono text-[11px]">
-                                <div className="flex justify-between font-medium">
-                                  <span>${item.currentSpend.toFixed(2)}</span>
-                                  <span className="text-neutral-400">{item.maxBudget === 0 ? "Unlimited" : `$${item.maxBudget.toFixed(2)}`}</span>
-                                </div>
-                                {item.maxBudget > 0 && (
-                                  <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full transition-all ${spendPercent > 90 ? "bg-rose-500" : spendPercent > 70 ? "bg-amber-500" : "bg-primary-600"}`} 
-                                      style={{ width: `${spendPercent}%` }} 
-                                    />
-                                  </div>
-                                )}
-                              </div>
+                            <td className="py-3.5 px-4 text-right font-mono font-semibold text-neutral-900 dark:text-white whitespace-nowrap">
+                              ${item.currentSpend.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           )}
 
-                          {/* Assigned Models Chips Column */}
+                          {/* Models Chips Column */}
                           {visibleColumns.assignedModels && (
                             <td className="py-3.5 px-4 max-w-[180px]">
-                              <div className="flex flex-wrap gap-1">
-                                {item.assignedModels.slice(0, 3).map((m) => (
+                              <div className="flex flex-wrap gap-1" title={item.assignedModels.join(", ")}>
+                                {item.assignedModels.slice(0, 2).map((m) => (
                                   <span key={m} className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-200/50">
                                     {m}
                                   </span>
                                 ))}
-                                {item.assignedModels.length > 3 && (
+                                {item.assignedModels.length > 2 && (
                                   <span className="px-1.5 py-0.5 rounded-md bg-primary-50 dark:bg-primary-950/60 text-[11px] font-bold text-primary-700 dark:text-primary-300">
-                                    +{item.assignedModels.length - 3} More
+                                    +{item.assignedModels.length - 2} More
                                   </span>
                                 )}
                               </div>
                             </td>
                           )}
 
-                          {/* Rate Limits Column */}
-                          {visibleColumns.rateLimits && (
+                          {/* TPM Limit */}
+                          {visibleColumns.tpmLimit && (
                             <td className="py-3.5 px-4 font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
-                              <div>TPM: {item.tpmLimit.toLocaleString()}</div>
-                              <div>RPM: {item.rpmLimit.toLocaleString()}</div>
+                              {item.tpmLimit.toLocaleString()}
                             </td>
                           )}
 
-                          {/* Members Column */}
+                          {/* RPM Limit */}
+                          {visibleColumns.rpmLimit && (
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
+                              {item.rpmLimit.toLocaleString()}
+                            </td>
+                          )}
+
+                          {/* Country */}
+                          {visibleColumns.country && (
+                            <td className="py-3.5 px-4 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+                              {item.country || "United States"}
+                            </td>
+                          )}
+
+                          {/* Status Badge */}
+                          {visibleColumns.status && (
+                            <td className="py-3.5 px-4">{renderStatusBadge(item.status)}</td>
+                          )}
+
+                          {/* Members Column (Centered) */}
                           {visibleColumns.membersCount && (
-                            <td className="py-3.5 px-4">
+                            <td className="py-3.5 px-4 text-center">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1100,17 +1257,12 @@ export default function OrganizationManagement() {
                                   setDetailTab("members");
                                   setViewState("detail");
                                 }}
-                                className="font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+                                className="font-semibold text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1"
                               >
                                 <Users className="w-3.5 h-3.5" />
-                                <span>{item.membersCount} Members</span>
+                                <span>{item.membersCount}</span>
                               </button>
                             </td>
-                          )}
-
-                          {/* Status Badge */}
-                          {visibleColumns.status && (
-                            <td className="py-3.5 px-4">{renderStatusBadge(item.status)}</td>
                           )}
 
                           {/* Actions Three-Dot Menu */}
@@ -1128,7 +1280,7 @@ export default function OrganizationManagement() {
                             </button>
 
                             {isMenuOpen && (
-                              <div className="absolute right-4 top-10 z-30 w-44 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg py-1.5 text-left text-xs animate-fadeIn">
+                              <div className="absolute right-4 top-10 z-30 w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg py-1.5 text-left text-xs animate-fadeIn">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1139,7 +1291,7 @@ export default function OrganizationManagement() {
                                   className="w-full px-3 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                                 >
                                   <Eye className="w-3.5 h-3.5 text-neutral-500" />
-                                  <span>View Organization</span>
+                                  <span>View Details</span>
                                 </button>
 
                                 <button
@@ -1151,7 +1303,7 @@ export default function OrganizationManagement() {
                                   className="w-full px-3 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                                 >
                                   <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
-                                  <span>Edit Settings</span>
+                                  <span>Edit Organization</span>
                                 </button>
 
                                 <button
@@ -1159,13 +1311,25 @@ export default function OrganizationManagement() {
                                   onClick={() => {
                                     setActiveMenuId(null);
                                     setSelectedOrg(item);
-                                    setDetailTab("members");
-                                    setViewState("detail");
+                                    setShowStatusModal(true);
                                   }}
                                   className="w-full px-3 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                                 >
-                                  <Users className="w-3.5 h-3.5 text-neutral-500" />
-                                  <span>Members ({item.membersCount})</span>
+                                  <RefreshCw className="w-3.5 h-3.5 text-neutral-500" />
+                                  <span>{item.status === "Active" ? "Deactivate" : "Activate"}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    setSelectedOrg(item);
+                                    setShowLoginAsModal(true);
+                                  }}
+                                  className="w-full px-3 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
+                                >
+                                  <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                                  <span>Login as Organization</span>
                                 </button>
 
                                 <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
@@ -1180,7 +1344,7 @@ export default function OrganizationManagement() {
                                   className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 font-medium"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete</span>
+                                  <span>Soft Delete</span>
                                 </button>
                               </div>
                             )}
@@ -1214,7 +1378,7 @@ export default function OrganizationManagement() {
         /* ========================================================================= */
         selectedOrg && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Top Navigation & Action Buttons */}
+            {/* Top Navigation & Single HB Actions Dropdown */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <button
                 type="button"
@@ -1225,6 +1389,7 @@ export default function OrganizationManagement() {
                 Back to Organizations
               </button>
 
+              {/* Restore Single HB Actions Dropdown */}
               <div className="flex items-center gap-2 relative">
                 <button
                   type="button"
@@ -1248,31 +1413,31 @@ export default function OrganizationManagement() {
                       className="w-full px-3.5 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                     >
                       <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>Edit Settings</span>
+                      <span>Edit Organization</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
                         setShowHeaderActionsMenu(false);
-                        toast.info("Viewing Audit Logs for " + selectedOrg.name);
+                        setShowStatusModal(true);
                       }}
                       className="w-full px-3.5 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                     >
-                      <FileText className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>View Audit Logs</span>
+                      <RefreshCw className="w-3.5 h-3.5 text-neutral-500" />
+                      <span>{selectedOrg.status === "Active" ? "Deactivate" : "Activate"}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
                         setShowHeaderActionsMenu(false);
-                        toast.success(`Organization "${selectedOrg.name}" archived.`);
+                        setShowLoginAsModal(true);
                       }}
                       className="w-full px-3.5 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                     >
-                      <Lock className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>Archive Organization</span>
+                      <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                      <span>Login as Organization</span>
                     </button>
 
                     <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
@@ -1286,14 +1451,14 @@ export default function OrganizationManagement() {
                       className="w-full px-3.5 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 font-medium"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>Delete Organization</span>
+                      <span>Soft Delete</span>
                     </button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Header Summary Card */}
+            {/* Original HB Header Summary Card */}
             <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 shadow-xs space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
                 <div className="space-y-1">
@@ -1375,7 +1540,7 @@ export default function OrganizationManagement() {
               </div>
             </div>
 
-            {/* OVERVIEW TAB — 7 RESPONSIVE DASHBOARD CARDS */}
+            {/* OVERVIEW TAB */}
             {detailTab === "overview" && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
                 {/* CARD 1 — ORGANIZATION INFORMATION */}
@@ -1481,7 +1646,7 @@ export default function OrganizationManagement() {
                   </div>
                 </div>
 
-                {/* CARD 4 — TEAMS */}
+                {/* CARD 4 — ASSIGNED TEAMS */}
                 <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
                   <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                     <div className="flex items-center gap-2">
@@ -1510,7 +1675,7 @@ export default function OrganizationManagement() {
               </div>
             )}
 
-            {/* MEMBERS TAB IMPLEMENTATION */}
+            {/* MEMBERS TAB */}
             {detailTab === "members" && (
               <div className="space-y-4 text-xs animate-fadeIn">
                 {/* Members Action Toolbar */}
@@ -1613,9 +1778,6 @@ export default function OrganizationManagement() {
                               <Users className="w-10 h-10 mx-auto text-neutral-300 dark:text-neutral-700 stroke-1" />
                               <div className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No Members Added</div>
                               <p className="text-xs max-w-sm mx-auto">No members match your search or filter selection in this organization.</p>
-                              <PrimaryButton icon={Plus} onClick={handleOpenAddMemberModal}>
-                                Add Member
-                              </PrimaryButton>
                             </td>
                           </tr>
                         ) : (
@@ -1639,7 +1801,6 @@ export default function OrganizationManagement() {
                                   />
                                 </td>
 
-                                {/* User Information Column (3 Lines) */}
                                 <td className="py-3.5 px-4">
                                   <div className="space-y-0.5">
                                     <div className="font-bold text-neutral-900 dark:text-white">{mem.name}</div>
@@ -1653,7 +1814,6 @@ export default function OrganizationManagement() {
                                   </div>
                                 </td>
 
-                                {/* Organization Role Badge */}
                                 <td className="py-3.5 px-4">
                                   <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
                                     mem.role === "Organization Admin"
@@ -1666,15 +1826,12 @@ export default function OrganizationManagement() {
                                   </span>
                                 </td>
 
-                                {/* Current Spend */}
                                 <td className="py-3.5 px-4 font-mono font-medium text-neutral-700 dark:text-neutral-300">
                                   {mem.currentSpend > 0 ? `$${mem.currentSpend.toFixed(2)}` : "—"}
                                 </td>
 
-                                {/* Joined Date */}
                                 <td className="py-3.5 px-4 text-neutral-500">{mem.joinedDate}</td>
 
-                                {/* Status Badge */}
                                 <td className="py-3.5 px-4">
                                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                                     mem.status === "Active"
@@ -1688,7 +1845,6 @@ export default function OrganizationManagement() {
                                   </span>
                                 </td>
 
-                                {/* Actions Menu */}
                                 <td className="py-3.5 px-4 text-right relative">
                                   <button
                                     type="button"
@@ -1714,20 +1870,6 @@ export default function OrganizationManagement() {
                                         <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
                                         <span>Edit Member / Role</span>
                                       </button>
-
-                                      {mem.status === "Pending Invitation" && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setActiveMemberMenuId(null);
-                                            handleResendInvitation(mem);
-                                          }}
-                                          className="w-full px-3 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
-                                        >
-                                          <RefreshCw className="w-3.5 h-3.5 text-amber-500" />
-                                          <span>Resend Invitation</span>
-                                        </button>
-                                      )}
 
                                       <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
 
@@ -1757,25 +1899,17 @@ export default function OrganizationManagement() {
               </div>
             )}
 
-            {/* SETTINGS TAB IMPLEMENTATION (VIEW MODE + INLINE EDIT MODE) */}
+            {/* SETTINGS TAB */}
             {detailTab === "settings" && (
               <div className="space-y-6 text-xs animate-fadeIn">
-                {/* Header Action Bar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 shadow-2xs">
                   <div>
                     <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2">
                       <Lock className="w-4.5 h-4.5 text-primary-600" />
                       Organization Settings & Configuration
-                      {isSettingsEditMode && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300">
-                          Inline Edit Mode Active
-                        </span>
-                      )}
                     </h3>
                     <p className="text-xs text-neutral-500 mt-0.5">
-                      {isSettingsEditMode
-                        ? "Modify organization settings below and click Save Changes to persist."
-                        : "View enterprise budgets, permitted models, rate limits, and object permissions."}
+                      View enterprise budgets, permitted models, rate limits, and object permissions.
                     </p>
                   </div>
 
@@ -1786,11 +1920,9 @@ export default function OrganizationManagement() {
                   )}
                 </div>
 
-                {/* VIEW MODE CARDS */}
                 {!isSettingsEditMode ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {/* CARD 1 — BASIC INFORMATION */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
+                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs space-y-3.5">
                       <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                         <Building2 className="w-4 h-4 text-primary-600" />
                         <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Basic Information</h4>
@@ -1802,12 +1934,7 @@ export default function OrganizationManagement() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-neutral-400 font-medium">Organization ID:</span>
-                          <div className="flex items-center gap-1 font-mono text-[11px]">
-                            <span className="truncate max-w-[120px]">{selectedOrg.orgId}</span>
-                            <button type="button" onClick={() => handleCopyText(selectedOrg.orgId, "Copied Organization ID!")} title="Copy Org ID">
-                              <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600" />
-                            </button>
-                          </div>
+                          <span className="font-mono text-neutral-700 dark:text-neutral-300">{selectedOrg.orgId}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-neutral-400 font-medium">Created Date:</span>
@@ -1815,7 +1942,7 @@ export default function OrganizationManagement() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-neutral-400 font-medium">Created By:</span>
-                          <span className="font-semibold text-neutral-700 dark:text-neutral-300 truncate max-w-[140px]">{selectedOrg.createdBy}</span>
+                          <span className="font-semibold text-neutral-700 dark:text-neutral-300">{selectedOrg.createdBy}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-neutral-400 font-medium">Status:</span>
@@ -1824,40 +1951,33 @@ export default function OrganizationManagement() {
                       </div>
                     </div>
 
-                    {/* CARD 2 — BUDGET CONFIGURATION */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
+                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs space-y-3.5">
                       <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="w-4 h-4 text-emerald-600" />
                           <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Budget Configuration</h4>
                         </div>
-                        <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200/50">
+                        <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                           {selectedOrg.resetCycle} Reset
                         </span>
                       </div>
                       <div className="space-y-2.5 font-mono">
                         <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
                           <span>Max Budget:</span>
-                          <span className="font-bold text-neutral-900 dark:text-white">{selectedOrg.maxBudget === 0 ? "Unlimited" : `$${selectedOrg.maxBudget.toFixed(2)}`}</span>
+                          <span className="font-bold text-neutral-900 dark:text-white">${selectedOrg.maxBudget.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
                           <span>Soft Budget (80%):</span>
-                          <span className="font-bold text-neutral-900 dark:text-white">{selectedOrg.maxBudget === 0 ? "Unlimited" : `$${(selectedOrg.maxBudget * 0.8).toFixed(2)}`}</span>
+                          <span className="font-bold text-neutral-900 dark:text-white">${(selectedOrg.maxBudget * 0.8).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
                           <span>Current Spend:</span>
                           <span className="font-bold text-neutral-900 dark:text-white">${selectedOrg.currentSpend.toFixed(2)}</span>
                         </div>
-                        {selectedOrg.maxBudget > 0 && (
-                          <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden mt-1">
-                            <div className="h-full bg-primary-600 rounded-full" style={{ width: `${Math.min(100, (selectedOrg.currentSpend / selectedOrg.maxBudget) * 100)}%` }} />
-                          </div>
-                        )}
                       </div>
                     </div>
 
-                    {/* CARD 3 — RATE LIMITS */}
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-md transition-shadow space-y-3.5">
+                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs space-y-3.5">
                       <div className="flex items-center gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
                         <ShieldCheck className="w-4 h-4 text-amber-600" />
                         <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Rate Limits</h4>
@@ -1866,44 +1986,33 @@ export default function OrganizationManagement() {
                         <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-lg text-center">
                           <div className="text-neutral-400 text-[10px] font-semibold uppercase">TPM Limit</div>
                           <div className="text-base font-bold text-neutral-900 dark:text-white font-mono mt-0.5">
-                            {selectedOrg.tpmLimit ? selectedOrg.tpmLimit.toLocaleString() : "Unlimited"}
+                            {selectedOrg.tpmLimit.toLocaleString()}
                           </div>
                         </div>
                         <div className="p-3 bg-neutral-50 dark:bg-neutral-800/60 rounded-lg text-center">
                           <div className="text-neutral-400 text-[10px] font-semibold uppercase">RPM Limit</div>
                           <div className="text-base font-bold text-neutral-900 dark:text-white font-mono mt-0.5">
-                            {selectedOrg.rpmLimit ? selectedOrg.rpmLimit.toLocaleString() : "Unlimited"}
+                            {selectedOrg.rpmLimit.toLocaleString()}
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  /* INLINE EDIT MODE FORM LAYOUT */
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg p-6 space-y-6 animate-fadeIn">
-                    {/* Section 1 — Basic Information */}
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg p-6 space-y-6">
                     <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <Building2 className="w-4 h-4 text-primary-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Basic Information</h4>
-                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1 md:col-span-2">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                            Organization Name <span className="text-rose-500">*</span>
-                          </label>
+                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Organization Name *</label>
                           <input
                             type="text"
                             value={settingsFormName}
                             onChange={(e) => setSettingsFormName(e.target.value)}
-                            placeholder="Organization Name"
                             className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
                           />
                         </div>
                         <div className="space-y-1 md:col-span-2">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                            Description
-                          </label>
+                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Description</label>
                           <textarea
                             value={settingsFormDescription}
                             onChange={(e) => setSettingsFormDescription(e.target.value)}
@@ -1914,83 +2023,11 @@ export default function OrganizationManagement() {
                       </div>
                     </div>
 
-                    {/* Section 2 — Budget */}
-                    <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <BarChart3 className="w-4 h-4 text-emerald-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Budget Configuration</h4>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Max Budget ($)</label>
-                          <input
-                            type="number"
-                            value={settingsMaxBudget}
-                            onChange={(e) => setSettingsMaxBudget(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Soft Budget Limit ($)</label>
-                          <input
-                            type="number"
-                            value={settingsSoftBudget}
-                            onChange={(e) => setSettingsSoftBudget(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Reset Cycle</label>
-                          <select
-                            value={settingsResetCycle}
-                            onChange={(e) => setSettingsResetCycle(e.target.value as any)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
-                          >
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Yearly">Yearly</option>
-                            <option value="Never">Never</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 3 — Rate Limits */}
-                    <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <ShieldCheck className="w-4 h-4 text-amber-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Rate Limits</h4>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">TPM Limit</label>
-                          <input
-                            type="number"
-                            value={settingsTpmLimit}
-                            onChange={(e) => setSettingsTpmLimit(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">RPM Limit</label>
-                          <input
-                            type="number"
-                            value={settingsRpmLimit}
-                            onChange={(e) => setSettingsRpmLimit(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Sticky Footer Bar */}
-                    <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between sticky bottom-0 bg-white dark:bg-neutral-900 p-2 shadow-lg rounded-b-xl">
+                    <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
                       <button
                         type="button"
-                        onClick={handleCancelInlineSettings}
-                        className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100"
+                        onClick={() => setIsSettingsEditMode(false)}
+                        className="px-4 py-2 border border-neutral-300 rounded-lg font-semibold text-xs"
                       >
                         Cancel
                       </button>
@@ -2007,7 +2044,7 @@ export default function OrganizationManagement() {
       )}
 
       {/* ========================================================================= */}
-      {/* 6-SECTION ENTERPRISE CREATE ORGANIZATION MODAL                             */}
+      {/* EXTENDED CREATE / EDIT ORGANIZATION MODAL                                 */}
       {/* ========================================================================= */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
@@ -2041,12 +2078,12 @@ export default function OrganizationManagement() {
 
             {/* Modal Scrollable Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs custom-scrollbar">
-              {/* SECTION 1 — BASIC INFORMATION */}
+              {/* SECTION 1 — ORGANIZATION INFORMATION */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Building2 className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                   <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Basic Information
+                    Organization Information
                   </h4>
                 </div>
 
@@ -2092,6 +2129,193 @@ export default function OrganizationManagement() {
                       maxLength={300}
                       rows={2}
                       className="w-full p-2.5 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* AI Model Selection */}
+                  <div className="space-y-3 md:col-span-2 pt-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Models Access Assignment
+                    </label>
+                    <div className="flex items-center gap-6 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer font-medium">
+                        <input
+                          type="radio"
+                          name="modelSelectionType"
+                          checked={formModelSelectionType === "all"}
+                          onChange={() => setFormModelSelectionType("all")}
+                          className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span>All Available Models</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer font-medium">
+                        <input
+                          type="radio"
+                          name="modelSelectionType"
+                          checked={formModelSelectionType === "selected"}
+                          onChange={() => setFormModelSelectionType("selected")}
+                          className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span>Selected Models</span>
+                      </label>
+                    </div>
+
+                    {formModelSelectionType === "selected" && (
+                      <div className="p-3 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-lg grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {AVAILABLE_MODELS.map((m) => {
+                          const isChecked = formSelectedModels.includes(m.name);
+                          return (
+                            <label key={m.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-neutral-50 dark:hover:bg-neutral-900 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFormSelectedModels(prev => [...prev, m.name]);
+                                  } else {
+                                    setFormSelectedModels(prev => prev.filter(x => x !== m.name));
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                              />
+                              <span className="font-medium text-neutral-800 dark:text-neutral-200 text-[11px]">{m.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Address Section Header */}
+                  <div className="md:col-span-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                    <h5 className="font-bold text-xs text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
+                      Address Details
+                    </h5>
+                  </div>
+
+                  {/* Country */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Country <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formCountry}
+                      onChange={(e) => setFormCountry(e.target.value)}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    >
+                      {Object.keys(COUNTRIES_AND_STATES).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* State */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      State / Province <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formState}
+                      onChange={(e) => setFormState(e.target.value)}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    >
+                      {(COUNTRIES_AND_STATES[formCountry] || []).map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* City */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">City</label>
+                    <input
+                      type="text"
+                      value={formCity}
+                      onChange={(e) => setFormCity(e.target.value)}
+                      placeholder="City"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    />
+                  </div>
+
+                  {/* ZIP Code */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">ZIP / Postal Code</label>
+                    <input
+                      type="text"
+                      value={formZipCode}
+                      onChange={(e) => setFormZipCode(e.target.value)}
+                      placeholder="Postal Code"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    />
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Phone Number</label>
+                    <input
+                      type="text"
+                      value={formPhone}
+                      onChange={(e) => setFormPhone(e.target.value)}
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2 — PRIMARY ADMINISTRATOR */}
+              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                  <ShieldCheck className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                    Primary Administrator
+                  </h4>
+                </div>
+
+                <div className="p-3 bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-[11px] text-blue-900 dark:text-blue-200">
+                  A verification email will be automatically sent to the Primary Administrator. The user verifies their email, sets their password, and activates their account.
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Admin Name */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formAdminName}
+                      onChange={(e) => setFormAdminName(e.target.value)}
+                      placeholder="Admin Full Name"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    />
+                  </div>
+
+                  {/* Admin Email */}
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={formAdminEmail}
+                      onChange={(e) => setFormAdminEmail(e.target.value)}
+                      placeholder="admin@company.com"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                    />
+                  </div>
+
+                  {/* Admin Phone */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Direct Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={formAdminPhone}
+                      onChange={(e) => setFormAdminPhone(e.target.value)}
+                      placeholder="+1 (555) 019-2831"
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
                     />
                   </div>
                 </div>
@@ -2162,7 +2386,7 @@ export default function OrganizationManagement() {
                   >
                     <option value="All">All Models</option>
                     {AVAILABLE_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
+                      <option key={m.id} value={m.name}>{m.name}</option>
                     ))}
                   </select>
                 </div>
@@ -2203,29 +2427,223 @@ export default function OrganizationManagement() {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <p className="text-xs text-neutral-500">
+              Export active dataset ({filteredOrgs.length} records) to your preferred file format:
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
               <button
                 type="button"
                 onClick={() => {
-                  toast.success(`Exported ${filteredOrgs.length} Organizations to CSV!`);
+                  toast.success("Exported Organizations list to CSV");
                   setShowExportModal(false);
                 }}
-                className="w-full p-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl hover:bg-primary-50 font-medium text-left flex items-center justify-between border"
+                className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-primary-500 flex flex-col items-center gap-2"
               >
-                <span>Export as CSV File</span>
-                <Download className="w-4 h-4 text-neutral-400" />
+                <FileText className="w-8 h-8 text-blue-600" />
+                <span className="font-bold">CSV Format</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => {
-                  toast.success(`Exported ${filteredOrgs.length} Organizations to Excel!`);
+                  toast.success("Exported Organizations list to Excel");
                   setShowExportModal(false);
                 }}
-                className="w-full p-3 bg-neutral-50 dark:bg-neutral-800 rounded-xl hover:bg-primary-50 font-medium text-left flex items-center justify-between border"
+                className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-primary-500 flex flex-col items-center gap-2"
               >
-                <span>Export as Excel Spreadsheet</span>
-                <Download className="w-4 h-4 text-neutral-400" />
+                <FileSpreadsheet className="w-8 h-8 text-emerald-600" />
+                <span className="font-bold">Excel (.xlsx)</span>
               </button>
+            </div>
+
+            <div className="pt-3 border-t flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK IMPORT MODAL */}
+      {showBulkImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-5">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-primary-600" />
+                  Bulk Import Organizations
+                </h3>
+                <p className="text-xs text-neutral-400">Step {importStep} of 4</p>
+              </div>
+              <button type="button" onClick={() => setShowBulkImportModal(false)}>
+                <X className="w-4 h-4 text-neutral-400" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] font-semibold text-neutral-500">
+              <div className={`py-1 rounded ${importStep >= 1 ? "bg-primary-600 text-white" : "bg-neutral-100"}`}>1. Template</div>
+              <div className={`py-1 rounded ${importStep >= 2 ? "bg-primary-600 text-white" : "bg-neutral-100"}`}>2. Upload</div>
+              <div className={`py-1 rounded ${importStep >= 3 ? "bg-primary-600 text-white" : "bg-neutral-100"}`}>3. Validation</div>
+              <div className={`py-1 rounded ${importStep >= 4 ? "bg-primary-600 text-white" : "bg-neutral-100"}`}>4. Results</div>
+            </div>
+
+            {importStep === 1 && (
+              <div className="space-y-4 text-xs">
+                <p className="text-neutral-500">
+                  Download the sample CSV template to ensure your data columns match Guardian Layer requirements.
+                </p>
+                <div className="p-4 rounded-xl border border-dashed text-center space-y-2">
+                  <FileSpreadsheet className="w-8 h-8 mx-auto text-emerald-600" />
+                  <p className="font-bold">guardian_layer_org_import_template.csv</p>
+                  <button 
+                    type="button"
+                    onClick={() => toast.success("Downloaded sample CSV template")}
+                    className="text-primary-600 hover:underline font-semibold"
+                  >
+                    Download Template
+                  </button>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <PrimaryButton onClick={() => setImportStep(2)}>Next: Upload CSV</PrimaryButton>
+                </div>
+              </div>
+            )}
+
+            {importStep === 2 && (
+              <div className="space-y-4 text-xs">
+                <div 
+                  onClick={() => setImportFile(new File(["sample"], "organizations.csv", { type: "text/csv" }))}
+                  className="p-8 rounded-xl border-2 border-dashed border-neutral-300 dark:border-neutral-700 text-center cursor-pointer hover:border-primary-500 space-y-2"
+                >
+                  <Upload className="w-8 h-8 mx-auto text-neutral-400" />
+                  <p className="font-bold text-neutral-800 dark:text-neutral-200">
+                    {importFile ? importFile.name : "Click to select CSV file"}
+                  </p>
+                  <p className="text-[11px] text-neutral-400">Max size 10MB (.csv or .xlsx)</p>
+                </div>
+                <div className="flex justify-between pt-2">
+                  <button type="button" onClick={() => setImportStep(1)} className="px-4 py-2 border rounded-lg">Back</button>
+                  <PrimaryButton disabled={!importFile} onClick={() => setImportStep(3)}>Next: Validate</PrimaryButton>
+                </div>
+              </div>
+            )}
+
+            {importStep === 3 && (
+              <div className="space-y-4 text-xs">
+                <div className="space-y-2">
+                  <div className="p-3 bg-emerald-50 text-emerald-800 rounded-lg flex justify-between font-semibold">
+                    <span>Valid Records Ready:</span>
+                    <span>14 Records</span>
+                  </div>
+                  <div className="p-3 bg-amber-50 text-amber-800 rounded-lg flex justify-between font-semibold">
+                    <span>Skipped / Duplicate Admin:</span>
+                    <span>1 Record</span>
+                  </div>
+                </div>
+                <div className="flex justify-between pt-2">
+                  <button type="button" onClick={() => setImportStep(2)} className="px-4 py-2 border rounded-lg">Back</button>
+                  <PrimaryButton onClick={() => {
+                    setImportResults({ success: 14, failed: 0, skipped: 1 });
+                    setImportStep(4);
+                  }}>
+                    Execute Import
+                  </PrimaryButton>
+                </div>
+              </div>
+            )}
+
+            {importStep === 4 && importResults && (
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-xl text-center space-y-2">
+                  <Check className="w-8 h-8 mx-auto text-emerald-500" />
+                  <h4 className="font-bold text-sm">Import Completed Successfully</h4>
+                  <div className="grid grid-cols-3 gap-2 text-center pt-2">
+                    <div className="p-2 bg-emerald-100 dark:bg-emerald-950/60 rounded">
+                      <span className="font-bold text-emerald-800 dark:text-emerald-300 block">{importResults.success}</span>
+                      <span className="text-[10px]">Imported</span>
+                    </div>
+                    <div className="p-2 bg-rose-100 dark:bg-rose-950/60 rounded">
+                      <span className="font-bold text-rose-800 dark:text-rose-300 block">{importResults.failed}</span>
+                      <span className="text-[10px]">Failed</span>
+                    </div>
+                    <div className="p-2 bg-amber-100 dark:bg-amber-950/60 rounded">
+                      <span className="font-bold text-amber-800 dark:text-amber-300 block">{importResults.skipped}</span>
+                      <span className="text-[10px]">Skipped</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <PrimaryButton onClick={() => setShowBulkImportModal(false)}>Close Wizard</PrimaryButton>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* LOGIN AS ORGANIZATION CONFIRMATION MODAL */}
+      {showLoginAsModal && selectedOrg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex items-center gap-3 text-blue-600">
+              <LogIn className="w-6 h-6" />
+              <h3 className="font-bold text-base text-neutral-900 dark:text-white">
+                Login as Organization?
+              </h3>
+            </div>
+            <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              You are about to temporarily access <strong>"{selectedOrg.name}"</strong>&apos;s workspace using Super Admin privileges. This action is intended for troubleshooting and support purposes.
+            </p>
+            <div className="pt-2 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLoginAsModal(false)}
+                className="px-4 py-2 border border-neutral-300 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <PrimaryButton onClick={() => {
+                toast.success(`Access granted! Temporary session started for '${selectedOrg.name}'.`);
+                setShowLoginAsModal(false);
+              }}>
+                Continue
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STATUS TOGGLE CONFIRMATION MODAL */}
+      {showStatusModal && selectedOrg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex items-center gap-3 text-amber-600">
+              <RefreshCw className="w-6 h-6" />
+              <h3 className="font-bold text-base text-neutral-900 dark:text-white">
+                Confirm Status Change
+              </h3>
+            </div>
+            <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              Are you sure you want to change status of <strong>"{selectedOrg.name}"</strong> from <strong>{selectedOrg.status}</strong> to <strong>{selectedOrg.status === "Active" ? "Inactive" : "Active"}</strong>?
+            </p>
+            <div className="pt-2 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(false)}
+                className="px-4 py-2 border border-neutral-300 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <PrimaryButton onClick={handleToggleStatusConfirm}>
+                Confirm Change
+              </PrimaryButton>
             </div>
           </div>
         </div>
@@ -2240,213 +2658,87 @@ export default function OrganizationManagement() {
             </div>
             <div>
               <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                Delete Organization?
+                Soft Delete Organization?
               </h3>
               <p className="text-xs text-neutral-500 mt-1">
-                Are you sure you want to permanently delete <strong>"{selectedOrg.name}"</strong>? This action cannot be undone.
+                Are you sure you want to soft delete <strong>"{selectedOrg.name}"</strong> ({selectedOrg.orgId})? All member access will be suspended while preserving audit records.
               </p>
             </div>
-            <div className="pt-2 flex justify-center gap-3">
+            <div className="pt-2 flex justify-center gap-3 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
+                className="px-4 py-2 border border-neutral-300 rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleDeleteOrgSubmit}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                onClick={handleDeleteOrganization}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg"
               >
-                Delete Organization
+                Soft Delete
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ADD MEMBER MODAL (800-900px Width, Centered, Sticky Footer) */}
+      {/* ADD MEMBER MODAL */}
       {showAddMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col max-h-[85vh] overflow-hidden my-auto">
-            {/* Modal Sticky Header */}
-            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/50 dark:bg-neutral-900/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200/60 text-primary-600 flex items-center justify-center">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                    Add Organization Member
-                  </h3>
-                  <p className="text-xs text-neutral-500">
-                    Invite an existing user and assign an organization role.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddMemberModal(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-primary-600" />
+                Add Member to Organization
+              </h3>
+              <button type="button" onClick={() => setShowAddMemberModal(false)}>
+                <X className="w-4 h-4 text-neutral-400" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs custom-scrollbar">
-              {/* USER SELECTION */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white flex items-center gap-2">
-                    <Users className="w-4 h-4 text-primary-600" />
-                    Select User
-                  </h4>
-
-                  {/* Toggle between Email and User ID Lookup */}
-                  <div className="flex bg-neutral-200 dark:bg-neutral-800 p-0.5 rounded-lg text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setUserLookupMethod("email")}
-                      className={`px-3 py-1 rounded-md font-semibold transition-colors ${
-                        userLookupMethod === "email"
-                          ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-2xs"
-                          : "text-neutral-600 dark:text-neutral-400"
-                      }`}
-                    >
-                      Search by Email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUserLookupMethod("userId")}
-                      className={`px-3 py-1 rounded-md font-semibold transition-colors ${
-                        userLookupMethod === "userId"
-                          ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-2xs"
-                          : "text-neutral-600 dark:text-neutral-400"
-                      }`}
-                    >
-                      Search by User ID
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {userLookupMethod === "email" ? (
-                    <div className="space-y-1">
-                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                        User Email Address <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={selectedUserEmail}
-                        onChange={(e) => {
-                          setSelectedUserEmail(e.target.value);
-                          const matched = mockSystemUsers.find((u) => u.email === e.target.value);
-                          if (matched) setSelectedUserId(matched.id);
-                        }}
-                        className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none ${
-                          isDuplicateMember ? "border-rose-500 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700"
-                        }`}
-                      >
-                        {mockSystemUsers.map((u) => (
-                          <option key={u.id} value={u.email}>
-                            {u.name} ({u.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                        User ID <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={selectedUserId}
-                        onChange={(e) => {
-                          setSelectedUserId(e.target.value);
-                          const matched = mockSystemUsers.find((u) => u.id === e.target.value);
-                          if (matched) setSelectedUserEmail(matched.email);
-                        }}
-                        className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono font-medium text-neutral-900 dark:text-white focus:outline-none ${
-                          isDuplicateMember ? "border-rose-500 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700"
-                        }`}
-                      >
-                        {mockSystemUsers.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.id} — {u.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Inline Duplicate Validation Message */}
-                  {isDuplicateMember && (
-                    <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-medium flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>This user is already an active member of {selectedOrg?.name}.</span>
-                    </div>
-                  )}
-                </div>
+            <div className="space-y-4 text-xs">
+              <div className="space-y-2">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Select System User <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedUserEmail}
+                  onChange={(e) => setSelectedUserEmail(e.target.value)}
+                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium text-xs"
+                >
+                  {mockSystemUsers.map((u) => (
+                    <option key={u.id} value={u.email}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
               </div>
 
-              {/* ORGANIZATION ROLE */}
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <Lock className="w-4 h-4 text-purple-600" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Organization Role
-                  </h4>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Select Organization Role <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      value={selectedMemberRole}
-                      onChange={(e) => setSelectedMemberRole(e.target.value as any)}
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
-                    >
-                      <option value="Organization Admin">Organization Admin</option>
-                      <option value="Internal User">Internal User</option>
-                      <option value="Internal User Viewer">Internal User Viewer</option>
-                    </select>
-                  </div>
-
-                  {/* Dynamic Role Description Box */}
-                  <div className="p-3 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs space-y-1">
-                    <div className="font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-primary-600" />
-                      <span>{selectedMemberRole} Permission Scope</span>
-                    </div>
-                    <p className="text-neutral-600 dark:text-neutral-400">
-                      {selectedMemberRole === "Organization Admin"
-                        ? "Can manage organization settings, members, models, rate limits, and allocated budgets."
-                        : selectedMemberRole === "Internal User"
-                        ? "Can create and manage their own Virtual Keys within organization budgets and rate limits."
-                        : "Read-only access to assigned organization resources and reporting dashboards."}
-                    </p>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Organization Role <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedMemberRole}
+                  onChange={(e) => setSelectedMemberRole(e.target.value as any)}
+                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold text-xs"
+                >
+                  <option value="Organization Admin">Organization Admin</option>
+                  <option value="Internal User">Internal User</option>
+                  <option value="Internal User Viewer">Internal User Viewer</option>
+                </select>
               </div>
             </div>
 
-            {/* Modal Sticky Footer */}
-            <div className="px-6 py-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/80 dark:bg-neutral-900/80">
+            <div className="pt-3 border-t flex justify-end gap-3 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setShowAddMemberModal(false)}
-                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors"
+                className="px-4 py-2 border border-neutral-300 rounded-lg"
               >
                 Cancel
               </button>
-
-              <PrimaryButton
-                onClick={handleSaveAddMember}
-                disabled={!isAddMemberFormValid}
-              >
+              <PrimaryButton onClick={handleSaveAddMember} disabled={!isAddMemberFormValid}>
                 Add Member
               </PrimaryButton>
             </div>
@@ -2469,14 +2761,12 @@ export default function OrganizationManagement() {
             </div>
 
             <div className="space-y-4 text-xs">
-              {/* Read-Only Member Information */}
               <div className="p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg space-y-1 font-mono">
                 <div className="font-bold text-neutral-900 dark:text-white">{selectedMember.name}</div>
                 <div className="text-neutral-500 text-[11px]">{selectedMember.email}</div>
                 <div className="text-neutral-400 text-[10px]">User ID: {selectedMember.userId}</div>
               </div>
 
-              {/* Editable Role Selection */}
               <div className="space-y-2">
                 <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
                   Organization Role
@@ -2484,27 +2774,20 @@ export default function OrganizationManagement() {
                 <select
                   value={selectedMemberRole}
                   onChange={(e) => setSelectedMemberRole(e.target.value as any)}
-                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold"
+                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold text-xs"
                 >
                   <option value="Organization Admin">Organization Admin</option>
                   <option value="Internal User">Internal User</option>
                   <option value="Internal User Viewer">Internal User Viewer</option>
                 </select>
-                <p className="text-neutral-500 text-[11px]">
-                  {selectedMemberRole === "Organization Admin"
-                    ? "Can manage organization settings, members, and resources."
-                    : selectedMemberRole === "Internal User"
-                    ? "Can create and manage their own Virtual Keys."
-                    : "Read-only access to their assigned resources."}
-                </p>
               </div>
             </div>
 
-            <div className="pt-3 border-t flex justify-end gap-3">
+            <div className="pt-3 border-t flex justify-end gap-3 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setShowEditMemberModal(false)}
-                className="px-4 py-2 border border-neutral-300 rounded-lg font-semibold"
+                className="px-4 py-2 border border-neutral-300 rounded-lg"
               >
                 Cancel
               </button>
@@ -2519,7 +2802,7 @@ export default function OrganizationManagement() {
       {/* REMOVE MEMBER CONFIRMATION MODAL */}
       {showRemoveMemberModal && selectedMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 border border-rose-200 dark:border-rose-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-center">
+          <div className="bg-white dark:bg-neutral-900 border border-rose-200 dark:border-rose-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-center text-xs font-semibold">
             <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -2527,7 +2810,7 @@ export default function OrganizationManagement() {
               <h3 className="text-base font-bold text-neutral-900 dark:text-white">
                 Remove Organization Member?
               </h3>
-              <p className="text-xs text-neutral-500 mt-1">
+              <p className="text-xs text-neutral-500 font-normal mt-1">
                 Are you sure you want to remove <strong>"{selectedMember.name}"</strong>? This member will lose access to this organization.
               </p>
             </div>
@@ -2535,14 +2818,14 @@ export default function OrganizationManagement() {
               <button
                 type="button"
                 onClick={() => setShowRemoveMemberModal(false)}
-                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
+                className="px-4 py-2 border border-neutral-300 rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleRemoveMemberSubmit}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg"
               >
                 Remove Member
               </button>
