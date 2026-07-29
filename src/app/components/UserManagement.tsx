@@ -48,6 +48,7 @@ import { PageHeader, PrimaryButton, SecondaryButton, IconButton } from './hb/lis
 import { toast } from 'sonner';
 import UserDetail from './UserDetail';
 import UserEdit from './UserEdit';
+import { MultiEmailInput } from './TeamsManagement';
 import { UserStatusModal } from './UserStatusModal';
 import { User } from '../../mockAPI/usersData';
 
@@ -210,43 +211,27 @@ interface ColumnDef {
 
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'id', label: 'User ID' },
+  { key: 'userAlias', label: 'Full Name' },
   { key: 'email', label: 'Email' },
-  { key: 'status', label: 'Status' },
-  { key: 'role', label: 'Role' },
-  { key: 'userAlias', label: 'User Alias' },
-  { key: 'spendUsd', label: 'Spend (USD)' },
   { key: 'budgetUsd', label: 'Budget (USD)' },
-  { key: 'ssoId', label: 'SSO ID' },
+  { key: 'spendUsd', label: 'Spend (USD)' },
+  { key: 'role', label: 'Role' },
   { key: 'virtualKeysCount', label: 'Virtual Keys' },
   { key: 'createdAt', label: 'Created At' },
   { key: 'updatedAt', label: 'Updated At' },
+  { key: 'status', label: 'Status' },
 ];
 
 const AVAILABLE_ROLES_OPTIONS = [
-  {
-    name: "Admin (All Permissions)",
-    value: "Admin",
-    description: "Full administrative access across all gateway settings & APIs"
-  },
-  {
-    name: "Admin (View Only)",
-    value: "Viewer",
-    description: "Read-only access to admin panels and telemetry reports"
-  },
   {
     name: "Organization Admin",
     value: "Org Admin",
     description: "Administrative authority over assigned organization & teams"
   },
   {
-    name: "Internal User (Create/Delete/View)",
+    name: "Internal User",
     value: "Internal User",
     description: "Can manage virtual keys & personal resources"
-  },
-  {
-    name: "Internal User (View Only)",
-    value: "Developer",
-    description: "View-only access to assigned proxy routes"
   }
 ];
 
@@ -349,8 +334,9 @@ export default function UserManagement() {
   /* -------------------- MODAL POPUP STATES -------------------- */
   // Screen 1: Invite User Modal
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteFullName, setInviteFullName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRoleOption, setInviteRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[3]);
+  const [inviteRoleOption, setInviteRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[0]);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [inviteOrg, setInviteOrg] = useState('HB Enterprise');
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
@@ -361,8 +347,9 @@ export default function UserManagement() {
 
   const [inviteUnlimitedBudget, setInviteUnlimitedBudget] = useState(false);
   const [inviteMaxBudget, setInviteMaxBudget] = useState('500');
+  const [inviteSoftBudget, setInviteSoftBudget] = useState('400');
+  const [inviteAlertEmails, setInviteAlertEmails] = useState<string[]>(['john@company.com']);
   const [inviteBudgetReset, setInviteBudgetReset] = useState('Monthly');
-  const [inviteMetadata, setInviteMetadata] = useState('');
   const [inviteTouched, setInviteTouched] = useState(false);
   const [inviteIsSubmitting, setInviteIsSubmitting] = useState(false);
 
@@ -546,28 +533,21 @@ export default function UserManagement() {
   }, [sortedUsers, currentPage, rowsPerPage]);
 
   // Invite Form Validations
+  const isInviteFullNameValid = useMemo(() => {
+    return inviteFullName.trim() !== '';
+  }, [inviteFullName]);
+
   const isInviteEmailValid = useMemo(() => {
     return inviteEmail.trim() !== '' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim());
   }, [inviteEmail]);
 
-  const isInviteMetadataValid = useMemo(() => {
-    if (!inviteMetadata.trim()) return true;
-    try {
-      JSON.parse(inviteMetadata);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [inviteMetadata]);
-
   const isInviteFormValid = useMemo(() => {
     return (
+      isInviteFullNameValid &&
       isInviteEmailValid &&
-      inviteRoleOption !== null &&
-      inviteOrg.trim() !== '' &&
-      isInviteMetadataValid
+      inviteRoleOption !== null
     );
-  }, [isInviteEmailValid, inviteRoleOption, inviteOrg, isInviteMetadataValid]);
+  }, [isInviteFullNameValid, isInviteEmailValid, inviteRoleOption]);
 
   // Default Settings Edit Form Validation
   const isEditSettingsBudgetValid = useMemo(() => {
@@ -657,7 +637,7 @@ export default function UserManagement() {
       return;
     }
 
-    const headers = ["User ID", "Email", "Status", "Role", "User Alias", "Spend (USD)", "Budget (USD)", "SSO ID", "Virtual Keys", "Created At", "Updated At"];
+    const headers = ["User ID", "Email", "Status", "Role", "Full Name", "Spend (USD)", "Budget (USD)", "Virtual Keys", "Created At", "Updated At"];
     const rows = dataToExport.map((u) => [
       `"${u.id}"`,
       `"${u.email}"`,
@@ -666,7 +646,6 @@ export default function UserManagement() {
       `"${u.userAlias}"`,
       `"${u.spendUsd.toFixed(2)}"`,
       `"${u.budgetUsd !== null ? u.budgetUsd.toFixed(2) : "Unlimited"}"`,
-      `"${u.ssoId}"`,
       `"${u.virtualKeysCount}"`,
       `"${u.createdAt}"`,
       `"${u.updatedAt}"`,
@@ -838,16 +817,18 @@ export default function UserManagement() {
 
   /* -------------------- INVITE USER HANDLER -------------------- */
   const handleOpenInviteModal = () => {
+    setInviteFullName('');
     setInviteEmail('');
-    setInviteRoleOption(AVAILABLE_ROLES_OPTIONS[3]);
+    setInviteRoleOption(AVAILABLE_ROLES_OPTIONS[0]);
     setInviteOrg('HB Enterprise');
     setInviteTeams(['AI Research']);
     setInviteModels(['gpt-4o', 'claude-3-5-sonnet']);
     setInviteModelPreset('Configured Models');
     setInviteUnlimitedBudget(false);
     setInviteMaxBudget('500');
+    setInviteSoftBudget('400');
+    setInviteAlertEmails(['john@company.com']);
     setInviteBudgetReset('Monthly');
-    setInviteMetadata('');
     setInviteTouched(false);
     setInviteIsSubmitting(false);
     setShowInviteModal(true);
@@ -859,8 +840,7 @@ export default function UserManagement() {
 
     setInviteIsSubmitting(true);
     setTimeout(() => {
-      const alias = inviteEmail.split('@')[0].replace('.', ' ');
-      const formattedAlias = alias.charAt(0).toUpperCase() + alias.slice(1);
+      const formattedAlias = inviteFullName.trim() || inviteEmail.split('@')[0];
       const newUser: InternalUser = {
         id: `usr-lite-${Math.random().toString(36).substr(2, 6)}`,
         email: inviteEmail.trim(),
@@ -1099,7 +1079,7 @@ export default function UserManagement() {
         <>
           {/* 3. SUMMARY KPI CARDS (Collapsible) */}
           {showSummary && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4 transition-all duration-300 animate-fadeIn">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 transition-all duration-300 animate-fadeIn">
               {/* Total Users */}
               <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-shadow">
                 <div className="flex items-center justify-between mb-1">
@@ -1128,20 +1108,6 @@ export default function UserManagement() {
                 <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
                   {totalCount > 0 ? ((activeCount / totalCount) * 100).toFixed(1) : 0}% Operational
                 </div>
-              </div>
-
-              {/* Admin Users */}
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Admin Users</span>
-                  <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                {isLoading ? (
-                  <div className="h-7 bg-neutral-200 dark:bg-neutral-800 rounded w-16 animate-pulse my-1" />
-                ) : (
-                  <div className="text-2xl font-bold text-neutral-900 dark:text-white mb-0.5">{adminCount}</div>
-                )}
-                <div className="text-[11px] text-neutral-400 dark:text-neutral-500">System & Platform Admins</div>
               </div>
 
               {/* Organization Admins */}
@@ -1177,9 +1143,10 @@ export default function UserManagement() {
           )}
 
           {/* 4. TOOLBAR */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-2xs">
-            {/* Left: HB Expandable Search */}
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-3 bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+            {/* Right: HB Standard Toolbar Controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 1. Search */}
               {isSearchExpanded ? (
                 <div className="relative flex items-center animate-fadeIn">
                   <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1188,7 +1155,7 @@ export default function UserManagement() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by Email..."
+                    placeholder="Search by Email or Name..."
                     className="w-64 md:w-80 h-9 pl-9 pr-8 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                   />
                   {searchQuery ? (
@@ -1218,115 +1185,15 @@ export default function UserManagement() {
                 />
               )}
 
-              {/* HB Filter Drawer Trigger */}
-              <div className="relative filter-drawer-container">
-                <IconButton
-                  icon={Filter}
-                  label={activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filter"}
-                  onClick={() => setShowFilterDrawer(!showFilterDrawer)}
-                  title="Open Filter Drawer"
-                />
+              {/* 2. Filter */}
+              <IconButton
+                icon={Filter}
+                label={activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filter"}
+                onClick={() => setShowFilterDrawer(true)}
+                title="Open Filter Drawer"
+              />
 
-                {/* HB Filter Drawer Modal */}
-                {showFilterDrawer && (
-                  <div className="absolute left-0 top-full mt-2 z-40 w-80 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-4 space-y-4 animate-fadeIn">
-                    <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                      <div className="flex items-center gap-2">
-                        <SlidersHorizontal className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Filter Users</h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowFilterDrawer(false)}
-                        className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-3 text-xs">
-                      {/* User ID */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">User ID</label>
-                        <input
-                          type="text"
-                          value={filterUserId}
-                          onChange={(e) => setFilterUserId(e.target.value)}
-                          placeholder="e.g. usr-lite-8f9a2b"
-                          className="w-full h-8 px-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-neutral-900 dark:text-white"
-                        />
-                      </div>
-
-                      {/* SSO ID */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">SSO ID</label>
-                        <input
-                          type="text"
-                          value={filterSsoId}
-                          onChange={(e) => setFilterSsoId(e.target.value)}
-                          placeholder="e.g. sso-okta-8f9a"
-                          className="w-full h-8 px-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-neutral-900 dark:text-white"
-                        />
-                      </div>
-
-                      {/* Role */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Role</label>
-                        <select
-                          value={filterRole}
-                          onChange={(e) => setFilterRole(e.target.value)}
-                          className="w-full h-8 px-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium text-neutral-900 dark:text-white"
-                        >
-                          <option value="All">All Roles</option>
-                          <option value="Admin">Admin</option>
-                          <option value="Org Admin">Org Admin</option>
-                          <option value="Internal User">Internal User</option>
-                          <option value="Developer">Developer</option>
-                          <option value="Viewer">Viewer</option>
-                        </select>
-                      </div>
-
-                      {/* Team */}
-                      <div className="space-y-1">
-                        <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Team</label>
-                        <select
-                          value={filterTeam}
-                          onChange={(e) => setFilterTeam(e.target.value)}
-                          className="w-full h-8 px-2.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium text-neutral-900 dark:text-white"
-                        >
-                          <option value="All">All Teams</option>
-                          <option value="AI Research">AI Research</option>
-                          <option value="DevOps Core">DevOps Core</option>
-                          <option value="QA Testing">QA Testing</option>
-                          <option value="Infrastructure">Infrastructure</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                      <button
-                        type="button"
-                        onClick={handleResetFilters}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                      >
-                        Reset
-                      </button>
-                      <PrimaryButton
-                        onClick={() => {
-                          setShowFilterDrawer(false);
-                          toast.success("Applied filters to user list");
-                        }}
-                      >
-                        Apply Filters
-                      </PrimaryButton>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Action Icons */}
-            <div className="flex items-center gap-1.5">
+              {/* 3. Column Customization */}
               <div className="relative column-panel-container">
                 <IconButton
                   icon={Columns}
@@ -1366,6 +1233,7 @@ export default function UserManagement() {
                 )}
               </div>
 
+              {/* 4. Export */}
               <IconButton
                 icon={Download}
                 label="Export"
@@ -1373,6 +1241,7 @@ export default function UserManagement() {
                 title="Export to CSV"
               />
 
+              {/* 5. Refresh */}
               <IconButton
                 icon={RefreshCw}
                 label="Refresh"
@@ -1380,6 +1249,7 @@ export default function UserManagement() {
                 title="Refresh List"
               />
 
+              {/* 6. Summary Toggle */}
               <IconButton
                 icon={showSummary ? EyeOff : BarChart3}
                 label={showSummary ? "Hide Summary" : "Show Summary"}
@@ -1388,6 +1258,103 @@ export default function UserManagement() {
               />
             </div>
           </div>
+
+          {/* HB Filter Drawer Modal (Right Slide-over) */}
+          {showFilterDrawer && (
+            <div className="fixed inset-0 z-50 overflow-hidden animate-fadeIn">
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+                onClick={() => setShowFilterDrawer(false)}
+              />
+
+              <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+                <div className="w-screen max-w-sm bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col">
+                  {/* Header */}
+                  <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-900/50">
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                      <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Filter Users</h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowFilterDrawer(false)}
+                      className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+                    {/* User ID Filter */}
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">User ID</label>
+                      <input
+                        type="text"
+                        value={filterUserId}
+                        onChange={(e) => setFilterUserId(e.target.value)}
+                        placeholder="e.g. usr-lite-8f9a2b"
+                        className="w-full h-9 px-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                      />
+                    </div>
+
+                    {/* Role Filter */}
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Role</label>
+                      <select
+                        value={filterRole}
+                        onChange={(e) => setFilterRole(e.target.value)}
+                        className="w-full h-9 px-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium text-neutral-900 dark:text-white"
+                      >
+                        <option value="All">All Roles</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Org Admin">Org Admin</option>
+                        <option value="Internal User">Internal User</option>
+                        <option value="Developer">Developer</option>
+                        <option value="Viewer">Viewer</option>
+                      </select>
+                    </div>
+
+                    {/* Team Filter */}
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Team</label>
+                      <select
+                        value={filterTeam}
+                        onChange={(e) => setFilterTeam(e.target.value)}
+                        className="w-full h-9 px-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium text-neutral-900 dark:text-white"
+                      >
+                        <option value="All">All Teams</option>
+                        <option value="AI Research">AI Research</option>
+                        <option value="DevOps Core">DevOps Core</option>
+                        <option value="QA Testing">QA Testing</option>
+                        <option value="Infrastructure">Infrastructure</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-900/50">
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="px-4 py-2 rounded-lg text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      Reset
+                    </button>
+                    <PrimaryButton
+                      onClick={() => {
+                        setShowFilterDrawer(false);
+                        toast.success("Applied filters to user list");
+                      }}
+                    >
+                      Apply Filters
+                    </PrimaryButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 5. HB ENTERPRISE TABLE */}
           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
@@ -1409,6 +1376,7 @@ export default function UserManagement() {
                       </th>
                     )}
 
+                    {/* 1. User ID */}
                     {visibleColumns.id && (
                       <th onClick={() => handleSort('id')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
@@ -1418,6 +1386,17 @@ export default function UserManagement() {
                       </th>
                     )}
 
+                    {/* 2. Full Name */}
+                    {visibleColumns.userAlias && (
+                      <th onClick={() => handleSort('userAlias')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
+                        <div className="flex items-center gap-1">
+                          <span>Full Name</span>
+                          {sortField === 'userAlias' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
+                        </div>
+                      </th>
+                    )}
+
+                    {/* 3. Email */}
                     {visibleColumns.email && (
                       <th onClick={() => handleSort('email')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
@@ -1427,42 +1406,7 @@ export default function UserManagement() {
                       </th>
                     )}
 
-                    {visibleColumns.status && (
-                      <th onClick={() => handleSort('status')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
-                        <div className="flex items-center gap-1">
-                          <span>Status</span>
-                          {sortField === 'status' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
-                        </div>
-                      </th>
-                    )}
-
-                    {visibleColumns.role && (
-                      <th onClick={() => handleSort('role')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
-                        <div className="flex items-center gap-1">
-                          <span>Role</span>
-                          {sortField === 'role' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
-                        </div>
-                      </th>
-                    )}
-
-                    {visibleColumns.userAlias && (
-                      <th onClick={() => handleSort('userAlias')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
-                        <div className="flex items-center gap-1">
-                          <span>User Alias</span>
-                          {sortField === 'userAlias' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
-                        </div>
-                      </th>
-                    )}
-
-                    {visibleColumns.spendUsd && (
-                      <th onClick={() => handleSort('spendUsd')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
-                        <div className="flex items-center gap-1">
-                          <span>Spend (USD)</span>
-                          {sortField === 'spendUsd' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
-                        </div>
-                      </th>
-                    )}
-
+                    {/* 4. Budget (USD) */}
                     {visibleColumns.budgetUsd && (
                       <th onClick={() => handleSort('budgetUsd')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
@@ -1472,15 +1416,27 @@ export default function UserManagement() {
                       </th>
                     )}
 
-                    {visibleColumns.ssoId && (
-                      <th onClick={() => handleSort('ssoId')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    {/* 5. Spend (USD) */}
+                    {visibleColumns.spendUsd && (
+                      <th onClick={() => handleSort('spendUsd')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
-                          <span>SSO ID</span>
-                          {sortField === 'ssoId' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
+                          <span>Spend (USD)</span>
+                          {sortField === 'spendUsd' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
                         </div>
                       </th>
                     )}
 
+                    {/* 6. Role */}
+                    {visibleColumns.role && (
+                      <th onClick={() => handleSort('role')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
+                        <div className="flex items-center gap-1">
+                          <span>Role</span>
+                          {sortField === 'role' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
+                        </div>
+                      </th>
+                    )}
+
+                    {/* 7. Virtual Keys */}
                     {visibleColumns.virtualKeysCount && (
                       <th onClick={() => handleSort('virtualKeysCount')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
@@ -1490,6 +1446,7 @@ export default function UserManagement() {
                       </th>
                     )}
 
+                    {/* 8. Created At */}
                     {visibleColumns.createdAt && (
                       <th onClick={() => handleSort('createdAt')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
@@ -1499,6 +1456,7 @@ export default function UserManagement() {
                       </th>
                     )}
 
+                    {/* 9. Updated At */}
                     {visibleColumns.updatedAt && (
                       <th onClick={() => handleSort('updatedAt')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
                         <div className="flex items-center gap-1">
@@ -1508,6 +1466,17 @@ export default function UserManagement() {
                       </th>
                     )}
 
+                    {/* 10. Status */}
+                    {visibleColumns.status && (
+                      <th onClick={() => handleSort('status')} className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors">
+                        <div className="flex items-center gap-1">
+                          <span>Status</span>
+                          {sortField === 'status' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-600" /> : <ArrowDown className="w-3 h-3 text-primary-600" />) : <ArrowUpDown className="w-3 h-3 text-neutral-400 opacity-50" />}
+                        </div>
+                      </th>
+                    )}
+
+                    {/* 11. Actions */}
                     <th className="py-3 px-4 text-right pr-6">Actions</th>
                   </tr>
                 </thead>
@@ -1518,16 +1487,15 @@ export default function UserManagement() {
                       <tr key={idx} className="animate-pulse">
                         {isMultiSelectActive && <td className="py-4 px-4"><div className="w-4 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
                         {visibleColumns.id && <td className="py-4 px-4"><div className="w-24 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
-                        {visibleColumns.email && <td className="py-4 px-4"><div className="w-36 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
-                        {visibleColumns.status && <td className="py-4 px-4"><div className="w-16 h-4 bg-neutral-200 dark:bg-neutral-800 rounded-full" /></td>}
-                        {visibleColumns.role && <td className="py-4 px-4"><div className="w-20 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
                         {visibleColumns.userAlias && <td className="py-4 px-4"><div className="w-24 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
-                        {visibleColumns.spendUsd && <td className="py-4 px-4"><div className="w-16 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
+                        {visibleColumns.email && <td className="py-4 px-4"><div className="w-36 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
                         {visibleColumns.budgetUsd && <td className="py-4 px-4"><div className="w-16 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
-                        {visibleColumns.ssoId && <td className="py-4 px-4"><div className="w-20 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
+                        {visibleColumns.spendUsd && <td className="py-4 px-4"><div className="w-16 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
+                        {visibleColumns.role && <td className="py-4 px-4"><div className="w-20 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
                         {visibleColumns.virtualKeysCount && <td className="py-4 px-4"><div className="w-16 h-4 bg-neutral-200 dark:bg-neutral-800 rounded-full" /></td>}
                         {visibleColumns.createdAt && <td className="py-4 px-4"><div className="w-20 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
                         {visibleColumns.updatedAt && <td className="py-4 px-4"><div className="w-20 h-4 bg-neutral-200 dark:bg-neutral-800 rounded" /></td>}
+                        {visibleColumns.status && <td className="py-4 px-4"><div className="w-16 h-4 bg-neutral-200 dark:bg-neutral-800 rounded-full" /></td>}
                         <td className="py-4 px-4 text-right"><div className="w-6 h-6 bg-neutral-200 dark:bg-neutral-800 rounded ml-auto" /></td>
                       </tr>
                     ))
@@ -1554,6 +1522,7 @@ export default function UserManagement() {
                             </td>
                           )}
 
+                          {/* 1. User ID */}
                           {visibleColumns.id && (
                             <td className="py-3.5 px-4 font-mono text-xs font-semibold text-primary-600 dark:text-primary-400">
                               <button type="button" onClick={() => handleViewDetails(user)} className="hover:underline text-left focus:outline-none">
@@ -1562,48 +1531,23 @@ export default function UserManagement() {
                             </td>
                           )}
 
-                          {visibleColumns.email && (
+                          {/* 2. Full Name */}
+                          {visibleColumns.userAlias && (
                             <td className="py-3.5 px-4 font-medium text-neutral-900 dark:text-white">
-                              <button type="button" onClick={() => handleViewDetails(user)} className="hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-left focus:outline-none flex items-center gap-1.5">
-                                <span>{user.email}</span>
+                              <button type="button" onClick={() => handleViewDetails(user)} className="hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-left focus:outline-none">
+                                {user.userAlias}
                               </button>
                             </td>
                           )}
 
-                          {visibleColumns.status && (
-                            <td className="py-3.5 px-4">
-                              {user.status === 'active' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" /> Inactive
-                                </span>
-                              )}
-                            </td>
-                          )}
-
-                          {visibleColumns.role && (
-                            <td className="py-3.5 px-4">
-                              <span className="inline-block px-2.5 py-0.5 rounded-md text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-neutral-700">
-                                {user.role}
-                              </span>
-                            </td>
-                          )}
-
-                          {visibleColumns.userAlias && (
+                          {/* 3. Email */}
+                          {visibleColumns.email && (
                             <td className="py-3.5 px-4 font-medium text-neutral-800 dark:text-neutral-200">
-                              {user.userAlias}
+                              {user.email}
                             </td>
                           )}
 
-                          {visibleColumns.spendUsd && (
-                            <td className="py-3.5 px-4 font-mono font-semibold text-neutral-900 dark:text-white">
-                              ${user.spendUsd.toFixed(2)}
-                            </td>
-                          )}
-
+                          {/* 4. Budget (USD) */}
                           {visibleColumns.budgetUsd && (
                             <td className="py-3.5 px-4 font-mono">
                               {user.budgetUsd === null ? (
@@ -1618,12 +1562,23 @@ export default function UserManagement() {
                             </td>
                           )}
 
-                          {visibleColumns.ssoId && (
-                            <td className="py-3.5 px-4 font-mono text-neutral-500 dark:text-neutral-400 text-xs">
-                              {user.ssoId}
+                          {/* 5. Spend (USD) */}
+                          {visibleColumns.spendUsd && (
+                            <td className="py-3.5 px-4 font-mono font-semibold text-neutral-900 dark:text-white">
+                              ${user.spendUsd.toFixed(2)}
                             </td>
                           )}
 
+                          {/* 6. Role */}
+                          {visibleColumns.role && (
+                            <td className="py-3.5 px-4">
+                              <span className="inline-block px-2.5 py-0.5 rounded-md text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-neutral-700">
+                                {user.role}
+                              </span>
+                            </td>
+                          )}
+
+                          {/* 7. Virtual Keys */}
                           {visibleColumns.virtualKeysCount && (
                             <td className="py-3.5 px-4">
                               {user.virtualKeysCount === 0 ? (
@@ -1639,15 +1594,32 @@ export default function UserManagement() {
                             </td>
                           )}
 
+                          {/* 8. Created At */}
                           {visibleColumns.createdAt && (
                             <td className="py-3.5 px-4 text-neutral-500 dark:text-neutral-400">
                               {user.createdAt}
                             </td>
                           )}
 
+                          {/* 9. Updated At */}
                           {visibleColumns.updatedAt && (
                             <td className="py-3.5 px-4 text-neutral-500 dark:text-neutral-400">
                               {user.updatedAt}
+                            </td>
+                          )}
+
+                          {/* 10. Status */}
+                          {visibleColumns.status && (
+                            <td className="py-3.5 px-4">
+                              {user.status === 'active' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" /> Inactive
+                                </span>
+                              )}
                             </td>
                           )}
 
@@ -2233,6 +2205,29 @@ export default function UserManagement() {
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                        Full Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={inviteFullName}
+                        onChange={(e) => setInviteFullName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-medium text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all ${
+                          inviteTouched && !isInviteFullNameValid
+                            ? "border-rose-500 focus:ring-rose-500/20"
+                            : "border-neutral-300 dark:border-neutral-700 focus:border-primary-500 focus:ring-primary-500/20"
+                        }`}
+                      />
+                      {inviteTouched && !isInviteFullNameValid && (
+                        <p className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          Full Name is required.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
                         User Email <span className="text-rose-500">*</span>
                       </label>
                       <input
@@ -2302,47 +2297,10 @@ export default function UserManagement() {
                 <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                     <Building2 className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Organization & Teams</h4>
+                    <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Assigned Teams</h4>
                   </div>
 
                   <div className="space-y-4">
-                    <div className="space-y-1 relative org-select-dropdown">
-                      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                        Organization <span className="text-rose-500">*</span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowOrgDropdown(!showOrgDropdown)}
-                        className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors"
-                      >
-                        <span>{inviteOrg}</span>
-                        <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
-                      </button>
-
-                      {showOrgDropdown && (
-                        <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-1 space-y-0.5 animate-fadeIn">
-                          {AVAILABLE_ORGANIZATIONS.map((org) => (
-                            <button
-                              key={org}
-                              type="button"
-                              onClick={() => {
-                                setInviteOrg(org);
-                                setShowOrgDropdown(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${
-                                inviteOrg === org
-                                  ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 font-semibold"
-                                  : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900"
-                              }`}
-                            >
-                              <span>{org}</span>
-                              {inviteOrg === org && <Check className="w-3.5 h-3.5 text-primary-600" />}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
                     <div className="space-y-1 relative team-select-dropdown">
                       <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
                         Assigned Teams
@@ -2490,7 +2448,7 @@ export default function UserManagement() {
                   </label>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
                       Max Budget ($ USD)
@@ -2501,6 +2459,20 @@ export default function UserManagement() {
                       value={inviteUnlimitedBudget ? '' : inviteMaxBudget}
                       onChange={(e) => setInviteMaxBudget(e.target.value)}
                       placeholder={inviteUnlimitedBudget ? "Unlimited" : "500"}
+                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white disabled:opacity-50 disabled:bg-neutral-100 dark:disabled:bg-neutral-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                      Soft Budget ($ USD)
+                    </label>
+                    <input
+                      type="number"
+                      disabled={inviteUnlimitedBudget}
+                      value={inviteUnlimitedBudget ? '' : inviteSoftBudget}
+                      onChange={(e) => setInviteSoftBudget(e.target.value)}
+                      placeholder={inviteUnlimitedBudget ? "Unlimited" : "400"}
                       className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white disabled:opacity-50 disabled:bg-neutral-100 dark:disabled:bg-neutral-900"
                     />
                   </div>
@@ -2523,30 +2495,15 @@ export default function UserManagement() {
                     </select>
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                  <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Metadata Payload (Optional JSON)</h4>
-                </div>
-
-                <div className="space-y-1">
-                  <textarea
-                    rows={3}
-                    value={inviteMetadata}
-                    onChange={(e) => setInviteMetadata(e.target.value)}
-                    placeholder='{ "department": "AI R&D", "cost_center": "CC-904" }'
-                    className={`w-full p-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono text-neutral-900 dark:text-white focus:outline-none ${
-                      !isInviteMetadataValid ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700"
-                    }`}
+                {/* Budget Notification Email */}
+                <div className="pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                  <MultiEmailInput
+                    emails={inviteAlertEmails}
+                    onChange={setInviteAlertEmails}
+                    label="Budget Notification Email"
+                    helpText="Recipients receive email notifications when Soft Budget or Maximum Budget is reached."
                   />
-                  {!isInviteMetadataValid && (
-                    <p className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      Invalid JSON payload syntax.
-                    </p>
-                  )}
                 </div>
               </div>
             </div>

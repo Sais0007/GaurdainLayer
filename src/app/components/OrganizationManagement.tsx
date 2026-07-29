@@ -275,8 +275,8 @@ const mockOrgMembers: Record<string, OrgMemberItem[]> = {
 
 export default function OrganizationManagement() {
   const [organizations, setOrganizations] = useState<OrganizationItem[]>(mockOrganizations);
-  const [viewState, setViewState] = useState<"list" | "detail">("list");
-  const [selectedOrg, setSelectedOrg] = useState<OrganizationItem | null>(null);
+  const [viewState, setViewState] = useState<"list" | "detail">("detail");
+  const [selectedOrg, setSelectedOrg] = useState<OrganizationItem | null>(mockOrganizations[0]);
 
   // Members Tab Data & State
   const [membersMap, setMembersMap] = useState<Record<string, OrgMemberItem[]>>(mockOrgMembers);
@@ -1214,18 +1214,17 @@ export default function OrganizationManagement() {
         /* ========================================================================= */
         selectedOrg && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Top Navigation & Action Buttons */}
+            {/* Page Header with My Profile > Organization Details Breadcrumb */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <button
-                type="button"
-                onClick={() => setViewState("list")}
-                className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Organizations
-              </button>
+              <PageHeader
+                title="Organization Details"
+                breadcrumbs={[
+                  { label: "My Profile", href: "#" },
+                  { label: "Organization Details", current: true }
+                ]}
+              />
 
-              <div className="flex items-center gap-2 relative">
+              <div className="flex items-center gap-2 relative self-start sm:self-auto mb-4 sm:mb-0">
                 <button
                   type="button"
                   onClick={() => setShowHeaderActionsMenu(!showHeaderActionsMenu)}
@@ -1261,32 +1260,6 @@ export default function OrganizationManagement() {
                     >
                       <FileText className="w-3.5 h-3.5 text-neutral-500" />
                       <span>View Audit Logs</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowHeaderActionsMenu(false);
-                        toast.success(`Organization "${selectedOrg.name}" archived.`);
-                      }}
-                      className="w-full px-3.5 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
-                    >
-                      <Lock className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>Archive Organization</span>
-                    </button>
-
-                    <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowHeaderActionsMenu(false);
-                        setShowDeleteModal(true);
-                      }}
-                      className="w-full px-3.5 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 font-medium"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Delete Organization</span>
                     </button>
                   </div>
                 )}
@@ -1916,35 +1889,43 @@ export default function OrganizationManagement() {
 
                     {/* Section 2 — Budget */}
                     <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <BarChart3 className="w-4 h-4 text-emerald-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Budget Configuration</h4>
+                      <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-emerald-600" />
+                          <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Budget Configuration</h4>
+                        </div>
+                        <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-neutral-400" /> Read-only (Super Admin Managed)
+                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
                           <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Max Budget ($)</label>
                           <input
                             type="number"
+                            disabled
                             value={settingsMaxBudget}
                             onChange={(e) => setSettingsMaxBudget(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
+                            className="w-full h-10 px-3 bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg font-medium text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
                           />
                         </div>
                         <div className="space-y-1">
                           <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Soft Budget Limit ($)</label>
                           <input
                             type="number"
+                            disabled
                             value={settingsSoftBudget}
                             onChange={(e) => setSettingsSoftBudget(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
+                            className="w-full h-10 px-3 bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg font-medium text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
                           />
                         </div>
                         <div className="space-y-1">
                           <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Reset Cycle</label>
                           <select
+                            disabled
                             value={settingsResetCycle}
                             onChange={(e) => setSettingsResetCycle(e.target.value as any)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
+                            className="w-full h-10 px-3 bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg font-medium text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
                           >
                             <option value="Daily">Daily</option>
                             <option value="Weekly">Weekly</option>
@@ -1959,27 +1940,34 @@ export default function OrganizationManagement() {
 
                     {/* Section 3 — Rate Limits */}
                     <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
-                        <ShieldCheck className="w-4 h-4 text-amber-600" />
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Rate Limits</h4>
+                      <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-amber-600" />
+                          <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Rate Limits</h4>
+                        </div>
+                        <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-neutral-400" /> Read-only (Super Admin Managed)
+                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="block font-semibold text-neutral-800 dark:text-neutral-200">TPM Limit</label>
                           <input
                             type="number"
+                            disabled
                             value={settingsTpmLimit}
                             onChange={(e) => setSettingsTpmLimit(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
+                            className="w-full h-10 px-3 bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg font-medium text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
                           />
                         </div>
                         <div className="space-y-1">
                           <label className="block font-semibold text-neutral-800 dark:text-neutral-200">RPM Limit</label>
                           <input
                             type="number"
+                            disabled
                             value={settingsRpmLimit}
                             onChange={(e) => setSettingsRpmLimit(e.target.value)}
-                            className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium"
+                            className="w-full h-10 px-3 bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg font-medium text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
                           />
                         </div>
                       </div>

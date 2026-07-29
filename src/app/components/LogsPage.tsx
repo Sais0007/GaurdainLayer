@@ -15,8 +15,8 @@ const TABS: Tab[] = [
   { id: 'email', label: 'Email Logs',  icon: Mail   },
 ];
 
-export default function LogsPage() {
-  const [activeTab, setActiveTab] = useState<LogModuleType>('login');
+export default function LogsPage({ defaultTab = 'login' }: { defaultTab?: LogModuleType }) {
+  const [activeTab, setActiveTab] = useState<LogModuleType>(defaultTab);
 
   return (
     <div className="bg-neutral-50 dark:bg-neutral-950 min-h-screen">

@@ -140,6 +140,7 @@ export interface TeamItem {
   loggingIntegration: string;
   callbackUrl?: string;
   isPublic?: boolean;
+  alertEmails?: string[];
 }
 
 export interface ApiPermissionItem {
@@ -149,6 +150,129 @@ export interface ApiPermissionItem {
   description: string;
   access: boolean;
   category: "Virtual Keys" | "Users" | "Teams" | "Policies" | "Models" | "Organizations" | "Logging" | "Guardrails";
+}
+
+// --- Multi Email Input Component (Notification Email Recipients) ---
+export function MultiEmailInput({
+  emails,
+  onChange,
+  label = "Notification Email Recipients",
+  placeholder = "Type email and press Enter or comma...",
+  helpText = "Recipients receive email notifications when Soft Budget or Maximum Budget threshold is reached."
+}: {
+  emails: string[];
+  onChange: (newEmails: string[]) => void;
+  label?: string;
+  placeholder?: string;
+  helpText?: string;
+}) {
+  const [inputValue, setInputValue] = useState("");
+  const [error, setError] = useState("");
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  };
+
+  const addEmails = (rawInput: string) => {
+    const candidateEmails = rawInput
+      .split(/[\s,\n;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.length > 0);
+
+    if (candidateEmails.length === 0) return;
+
+    let addedCount = 0;
+    const newEmails = [...emails];
+
+    for (const email of candidateEmails) {
+      if (!validateEmail(email)) {
+        setError(`"${email}" is not a valid email address.`);
+        toast.error(`"${email}" is not a valid email address.`);
+        continue;
+      }
+      if (newEmails.includes(email)) {
+        setError(`"${email}" is already added.`);
+        continue;
+      }
+      newEmails.push(email);
+      addedCount++;
+    }
+
+    if (addedCount > 0) {
+      onChange(newEmails);
+      setInputValue("");
+      setError("");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === "," || e.key === ";") {
+      e.preventDefault();
+      addEmails(inputValue);
+    }
+  };
+
+  const handleBlur = () => {
+    if (inputValue.trim()) {
+      addEmails(inputValue);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData("text");
+    addEmails(pastedText);
+  };
+
+  const removeEmail = (indexToRemove: number) => {
+    onChange(emails.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  return (
+    <div className="space-y-1.5 col-span-full">
+      <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+        {label}
+      </label>
+      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+        {helpText}
+      </p>
+
+      <div className="min-h-[44px] p-2 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 transition-all flex flex-wrap items-center gap-2">
+        {emails.map((email, idx) => (
+          <span
+            key={email + idx}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-50 dark:bg-primary-950/60 border border-primary-200/80 dark:border-primary-800 text-primary-700 dark:text-primary-300 font-mono text-xs font-medium animate-fadeIn"
+          >
+            <Mail className="w-3 h-3 text-primary-500" />
+            {email}
+            <button
+              type="button"
+              onClick={() => removeEmail(idx)}
+              className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-primary-200/60 dark:hover:bg-primary-800/80 text-primary-600 dark:text-primary-400 transition-colors"
+              title={`Remove ${email}`}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+
+        <input
+          type="email"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            if (error) setError("");
+          }}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          onPaste={handlePaste}
+          placeholder={emails.length === 0 ? placeholder : "Add email..."}
+          className="flex-1 min-w-[180px] bg-transparent text-xs font-medium outline-none placeholder:text-neutral-400 dark:placeholder:text-neutral-600 py-0.5"
+        />
+      </div>
+      {error && <div className="text-[11px] text-rose-500 font-medium">{error}</div>}
+    </div>
+  );
 }
 
 const mockPermissions: ApiPermissionItem[] = [
@@ -251,28 +375,27 @@ const mockTeamsData: TeamItem[] = [
 
 export default function TeamsManagement() {
   const [teams, setTeams] = useState<TeamItem[]>(mockTeamsData);
-  const [viewState, setViewState] = useState<"list" | "detail">("list");
+  const [viewState, setViewState] = useState<"list" | "detail" | "edit" | "audit-log">("list");
   const [selectedTeam, setSelectedTeam] = useState<TeamItem | null>(null);
 
-  // Detail Sub-Tab State
-  const [detailTab, setDetailTab] = useState<"overview" | "my-users" | "virtual-keys" | "members" | "member-permissions" | "settings">("overview");
+  // Team Audit Log State (reusing Virtual Key Details -> Logs pattern)
+  const [teamAuditSearch, setTeamAuditSearch] = useState("");
+  const [teamAuditActionFilter, setTeamAuditActionFilter] = useState("All");
+  const [teamAuditPage, setTeamAuditPage] = useState(1);
 
-  // Inline Settings Edit Mode (Inside Settings Tab Only)
-  const [isEditingSettings, setIsEditingSettings] = useState(false);
+  // Detail Sub-Tab State (Member Permissions, My Users, and Settings removed)
+  const [detailTab, setDetailTab] = useState<"overview" | "virtual-keys" | "members">("overview");
 
   // Sub-Tab Search Queries
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchUserQuery, setSearchUserQuery] = useState("");
   const [searchKeyQuery, setSearchKeyQuery] = useState("");
   const [searchMemberQuery, setSearchMemberQuery] = useState("");
-  const [searchPermQuery, setSearchPermQuery] = useState("");
 
   // Summary Cards Visibility State
   const [showSummary, setShowSummary] = useState(true);
 
   // Filter Drawer State
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
-  const [filterOrg, setFilterOrg] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterModel, setFilterModel] = useState("All");
 
@@ -302,7 +425,6 @@ export default function TeamsManagement() {
 
   const allColumns: ColumnConfig[] = [
     { key: "name", label: "Team Name" },
-    { key: "organization", label: "Organization" },
     { key: "members", label: "Members" },
     { key: "spend", label: "Spend / Budget" },
     { key: "createdDate", label: "Created Date" },
@@ -311,7 +433,6 @@ export default function TeamsManagement() {
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     name: true,
-    organization: true,
     members: true,
     spend: true,
     createdDate: true,
@@ -350,11 +471,26 @@ export default function TeamsManagement() {
   const [formMaxBudget, setFormMaxBudget] = useState("5000");
   const [formSoftBudget, setFormSoftBudget] = useState("4000");
   const [formResetCycle, setFormResetCycle] = useState<"Monthly" | "Quarterly" | "Annual" | "Infinite">("Monthly");
+  const [formAlertEmails, setFormAlertEmails] = useState<string[]>(["john@company.com", "sarah@company.com", "finance@company.com"]);
   const [formTpmLimit, setFormTpmLimit] = useState("500000");
   const [formRpmLimit, setFormRpmLimit] = useState("5000");
   const [formTouched, setFormTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [highlightedTeamId, setHighlightedTeamId] = useState<string | null>(null);
+
+  // Virtual Key Specific Action Modals
+  const [selectedVkKey, setSelectedVkKey] = useState<TeamVirtualKeyRef | null>(null);
+  const [keyMenuPosition, setKeyMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [showVkViewModal, setShowVkViewModal] = useState(false);
+  const [showVkEditModal, setShowVkEditModal] = useState(false);
+  const [showVkRegenerateModal, setShowVkRegenerateModal] = useState(false);
+  const [showVkDisableModal, setShowVkDisableModal] = useState(false);
+  const [showVkDeleteModal, setShowVkDeleteModal] = useState(false);
+
+  // Edit Vk Form State
+  const [vkEditAlias, setVkEditAlias] = useState("");
+  const [vkEditType, setVkEditType] = useState<"AI APIs" | "Management" | "Full Access">("AI APIs");
+  const [vkEditBudget, setVkEditBudget] = useState("500");
 
   // Permissions Table State
   const [permissionsList, setPermissionsList] = useState<ApiPermissionItem[]>(mockPermissions);
@@ -373,11 +509,34 @@ export default function TeamsManagement() {
         setActiveKeyMenuId(null);
         setActiveUserMenuId(null);
         setShowMoreDetailMenu(false);
+        setMenuPosition(null);
+        setKeyMenuPosition(null);
       }
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
+
+  // Team Audit Logs Mock Data (matching Virtual Key Details -> Logs tab pattern)
+  const mockTeamAuditLogs = [
+    { id: "log-1", date: "Jul 29, 2026 18:45:00", user: "john.doe@company.com", action: "Team Config", ip: "192.168.1.45", status: "Success", description: "Updated soft budget warning threshold to 80% and added alert recipients" },
+    { id: "log-2", date: "Jul 28, 2026 14:30:12", user: "superadmin@spinecloudiq.com", action: "Key Operations", ip: "10.0.4.12", status: "Success", description: "Generated new Virtual Key 'prod-ai-gateway-key'" },
+    { id: "log-3", date: "Jul 26, 2026 11:15:33", user: "john.doe@company.com", action: "User Access", ip: "192.168.1.45", status: "Success", description: "Added user sarah.connor@company.com with role Developer" },
+    { id: "log-4", date: "Jul 24, 2026 16:02:19", user: "sarah.connor@company.com", action: "Budget Update", ip: "192.168.1.88", status: "Success", description: "Soft budget threshold alert triggered (80% spend reached)" },
+    { id: "log-5", date: "Jul 20, 2026 09:20:00", user: "system.bot", action: "Team Config", ip: "10.0.0.1", status: "Success", description: "Automated monthly budget cycle reset executed successfully" },
+    { id: "log-6", date: "Jul 15, 2026 13:40:05", user: "alex.smith@company.com", action: "Key Operations", ip: "172.16.0.22", status: "Success", description: "Regenerated Virtual Key secret for 'dev-sandbox-key'" },
+    { id: "log-7", date: "Jul 10, 2026 10:11:42", user: "john.doe@company.com", action: "User Access", ip: "192.168.1.45", status: "Success", description: "Updated role permissions for member finance@company.com" }
+  ];
+
+  const filteredTeamLogs = mockTeamAuditLogs.filter((l) => {
+    const matchesSearch = !teamAuditSearch || 
+      l.user.toLowerCase().includes(teamAuditSearch.toLowerCase()) || 
+      l.action.toLowerCase().includes(teamAuditSearch.toLowerCase()) || 
+      l.ip.toLowerCase().includes(teamAuditSearch.toLowerCase()) || 
+      l.description.toLowerCase().includes(teamAuditSearch.toLowerCase());
+    const matchesAction = teamAuditActionFilter === "All" || l.action === teamAuditActionFilter;
+    return matchesSearch && matchesAction;
+  });
 
   // Filtered & Sorted Teams
   const filteredTeams = useMemo(() => {
@@ -385,17 +544,15 @@ export default function TeamsManagement() {
       const matchesSearch = 
         !searchQuery ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.teamId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.organization.toLowerCase().includes(searchQuery.toLowerCase());
+        item.teamId.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesOrg = filterOrg === "All" || item.organization === filterOrg;
       const matchesStatus = filterStatus === "All" || item.status === filterStatus;
       const matchesModel =
         filterModel === "All" ||
         item.allowedModels.includes("All Proxy Models") ||
         item.allowedModels.includes(filterModel);
 
-      return matchesSearch && matchesOrg && matchesStatus && matchesModel;
+      return matchesSearch && matchesStatus && matchesModel;
     });
 
     result.sort((a, b) => {
@@ -411,7 +568,7 @@ export default function TeamsManagement() {
     });
 
     return result;
-  }, [teams, searchQuery, filterOrg, filterStatus, filterModel, sortField, sortDirection]);
+  }, [teams, searchQuery, filterStatus, filterModel, sortField, sortDirection]);
 
   // Paginated Teams
   const paginatedTeams = useMemo(() => {
@@ -441,14 +598,12 @@ export default function TeamsManagement() {
   const kpiStats = useMemo(() => {
     const totalTeams = teams.length;
     const activeTeams = teams.filter((t) => t.status === "Active").length;
-    const orgsSet = new Set(teams.map((t) => t.organization));
     const allModelsSet = new Set(teams.flatMap((t) => t.allowedModels));
     const totalBudgetAssigned = teams.reduce((acc, curr) => acc + curr.maxBudget, 0);
 
     return [
       { id: "total", label: "Total Teams", value: totalTeams, subValue: "All provisioned teams", icon: Users },
       { id: "active", label: "Active Teams", value: activeTeams, subValue: "Operational teams", icon: ShieldCheck },
-      { id: "orgs", label: "Organizations", value: orgsSet.size, subValue: "Connected orgs", icon: Building2 },
       { id: "models", label: "Configured Models", value: allModelsSet.size, subValue: "Distinct LLM models", icon: Cpu },
       { id: "budget", label: "Budget Assigned", value: `$${totalBudgetAssigned.toLocaleString()}`, subValue: "Total allocated budget", icon: DollarSign },
     ];
@@ -484,6 +639,7 @@ export default function TeamsManagement() {
     setFormMaxBudget("5000");
     setFormSoftBudget("4000");
     setFormResetCycle("Monthly");
+    setFormAlertEmails(["john@company.com", "sarah@company.com", "finance@company.com"]);
     setFormTpmLimit("500000");
     setFormRpmLimit("5000");
     setFormTouched(false);
@@ -530,6 +686,7 @@ export default function TeamsManagement() {
         createdBy: "superadmin@spinecloudiq.com",
         updatedDate: "Just now",
         allowedModels: allModelsSelected ? ["All Proxy Models"] : (formAllowedModels.length > 0 ? formAllowedModels : ["gpt-4o"]),
+        alertEmails: formAlertEmails,
         membersList: [{ id: "m-100", name: "John Doe", email: "john.doe@company.com", userId: "usr-904128", role: "Team Admin", models: formAllowedModels, budget: parseFloat(formMaxBudget) || 5000, currentSpend: 0, status: "Active", lastActive: "Just now", addedDate: "Just now" }],
         keysList: [],
         policies: ["Rate Limiting"],
@@ -674,7 +831,7 @@ export default function TeamsManagement() {
             <SearchBar
               value={searchQuery}
               onChange={(val) => setSearchQuery(val)}
-              placeholder="Search by Team Name, Team ID or Organization..."
+              placeholder="Search by Team Name or Team ID..."
             />
 
             <IconButton
@@ -734,7 +891,7 @@ export default function TeamsManagement() {
           </p>
 
           {showSummary && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4 transition-all duration-300 animate-fadeIn">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 transition-all duration-300 animate-fadeIn">
               {kpiStats.map((stat) => {
                 const IconComponent = stat.icon;
                 return (
@@ -774,15 +931,6 @@ export default function TeamsManagement() {
                         <div className="flex items-center gap-1.5">
                           <span>Team Name</span>
                           {renderSortIndicator("name")}
-                        </div>
-                      </th>
-                    )}
-
-                    {visibleColumns.organization && (
-                      <th onClick={() => handleSort("organization")} className="py-3 px-4 cursor-pointer select-none group hover:text-neutral-900 dark:hover:text-white transition-colors">
-                        <div className="flex items-center gap-1.5">
-                          <span>Organization</span>
-                          {renderSortIndicator("organization")}
                         </div>
                       </th>
                     )}
@@ -860,8 +1008,6 @@ export default function TeamsManagement() {
                           </td>
                         )}
 
-                        {visibleColumns.organization && <td className="py-3.5 px-4 font-medium text-neutral-800 dark:text-neutral-200">{item.organization}</td>}
-
                         {visibleColumns.members && (
                           <td className="py-3.5 px-4">
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -904,24 +1050,63 @@ export default function TeamsManagement() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setActiveMenuId(isMenuOpen ? null : item.id);
+                              if (activeMenuId === item.id) {
+                                setActiveMenuId(null);
+                                setMenuPosition(null);
+                              } else {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setMenuPosition({
+                                  top: rect.bottom + 4,
+                                  left: Math.max(10, rect.right - 192)
+                                });
+                                setActiveMenuId(item.id);
+                              }
                             }}
                             className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                            title="More Actions"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
 
-                          {isMenuOpen && (
-                            <div className="absolute right-4 top-10 z-30 w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg py-1.5 text-left text-xs animate-fadeIn">
-                              <button onClick={() => { setActiveMenuId(null); setSelectedTeam(item); setDetailTab("overview"); setViewState("detail"); }} className="w-full px-3 py-2 hover:bg-neutral-50 flex items-center gap-2">
+                          {isMenuOpen && menuPosition && (
+                            <div
+                              style={{ position: "fixed", top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+                              className="z-[9999] w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-2xl py-1.5 text-left text-xs animate-fadeIn action-menu-container"
+                            >
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setMenuPosition(null);
+                                  setSelectedTeam(item);
+                                  setDetailTab("overview");
+                                  setViewState("detail");
+                                }}
+                                className="w-full px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2 text-neutral-700 dark:text-neutral-300 transition-colors font-medium"
+                              >
                                 <Eye className="w-3.5 h-3.5 text-neutral-500" />
                                 <span>View</span>
                               </button>
-                              <button onClick={() => { setActiveMenuId(null); setSelectedTeam(item); setDetailTab("settings"); setIsEditingSettings(true); setViewState("detail"); }} className="w-full px-3 py-2 hover:bg-neutral-50 flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setMenuPosition(null);
+                                  setSelectedTeam(item);
+                                  setViewState("edit");
+                                }}
+                                className="w-full px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2 text-neutral-700 dark:text-neutral-300 transition-colors font-medium"
+                              >
                                 <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
-                                <span>Edit Settings</span>
+                                <span>Edit</span>
                               </button>
-                              <button onClick={() => { setActiveMenuId(null); setSelectedTeam(item); setShowDeleteModal(true); }} className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium">
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setMenuPosition(null);
+                                  setSelectedTeam(item);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 font-medium transition-colors"
+                              >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Delete</span>
                               </button>
@@ -947,9 +1132,9 @@ export default function TeamsManagement() {
             </div>
           </div>
         </>
-      ) : (
+      ) : viewState === "detail" ? (
         /* ========================================================================= */
-        /* VIEW 2: COMPLETE TEAM DETAILS WORKSPACE & ALL 6 SUB-TABS                  */
+        /* VIEW 2: COMPLETE TEAM DETAILS WORKSPACE                                   */
         /* ========================================================================= */
         selectedTeam && (
           <div className="space-y-6 animate-fadeIn">
@@ -985,8 +1170,6 @@ export default function TeamsManagement() {
                       </button>
                     </div>
                     <span>•</span>
-                    <span>Org: {selectedTeam.organization}</span>
-                    <span>•</span>
                     <span>Created: {selectedTeam.createdDate} by {selectedTeam.createdBy}</span>
                   </div>
                 </div>
@@ -1005,21 +1188,19 @@ export default function TeamsManagement() {
 
                   {showMoreDetailMenu && (
                     <div className="absolute right-0 top-12 z-30 w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl py-1.5 text-xs">
-                      <button onClick={() => { setShowMoreDetailMenu(false); toast.success("Audit Log query generated."); }} className="w-full px-3 py-2 text-left hover:bg-neutral-50 flex items-center gap-2">
+                      <button onClick={() => { setShowMoreDetailMenu(false); setViewState("edit"); }} className="w-full px-3 py-2 text-left hover:bg-neutral-50 flex items-center gap-2">
+                        <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>Edit Team</span>
+                      </button>
+                      <button 
+                        onClick={() => { 
+                          setShowMoreDetailMenu(false); 
+                          setViewState("audit-log");
+                        }} 
+                        className="w-full px-3 py-2 text-left hover:bg-neutral-50 flex items-center gap-2"
+                      >
                         <FileText className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>View Audit Logs</span>
-                      </button>
-                      <button onClick={() => { setShowMoreDetailMenu(false); toast.success(`Team "${selectedTeam.name} (Copy)" cloned.`); }} className="w-full px-3 py-2 text-left hover:bg-neutral-50 flex items-center gap-2">
-                        <CopyPlus className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>Duplicate Team</span>
-                      </button>
-                      <button onClick={() => { setShowMoreDetailMenu(false); toast.success(`Team "${selectedTeam.name}" archived.`); }} className="w-full px-3 py-2 text-left hover:bg-neutral-50 text-amber-600 flex items-center gap-2 font-medium">
-                        <Archive className="w-3.5 h-3.5" />
-                        <span>Archive Team</span>
-                      </button>
-                      <button onClick={() => { setShowMoreDetailMenu(false); toast.warning(`Team "${selectedTeam.name}" deactivated.`); }} className="w-full px-3 py-2 text-left hover:bg-neutral-50 text-amber-600 flex items-center gap-2 font-medium">
-                        <Ban className="w-3.5 h-3.5" />
-                        <span>Deactivate Team</span>
+                        <span>View Audit Log</span>
                       </button>
                       <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
                       <button onClick={() => { setShowMoreDetailMenu(false); setShowDeleteModal(true); }} className="w-full px-3 py-2 text-left hover:bg-rose-50 text-rose-600 flex items-center gap-2 font-medium">
@@ -1034,14 +1215,11 @@ export default function TeamsManagement() {
               {/* Shared Horizontal Sub-Tabs Bar */}
               <div className="border-b border-neutral-200 dark:border-neutral-800">
                 <div className="flex gap-6 text-xs font-semibold overflow-x-auto">
-                  {(["overview", "my-users", "virtual-keys", "members", "member-permissions", "settings"] as const).map((t) => (
+                  {(["overview", "virtual-keys", "members"] as const).map((t) => (
                     <button
                       key={t}
                       type="button"
-                      onClick={() => {
-                        setDetailTab(t);
-                        if (t !== "settings") setIsEditingSettings(false);
-                      }}
+                      onClick={() => setDetailTab(t)}
                       className={`py-3 border-b-2 transition-colors capitalize whitespace-nowrap ${
                         detailTab === t
                           ? "border-primary-600 text-primary-600 dark:text-primary-400 font-bold"
@@ -1091,90 +1269,7 @@ export default function TeamsManagement() {
                 </div>
               )}
 
-              {/* TAB 2: MY USERS TAB (FIXED ROW ACTIONS MENU PER SCREENSHOT 1) */}
-              {detailTab === "my-users" && (
-                <div className="space-y-4 pt-2 animate-fadeIn">
-                  <div className="flex items-center justify-between gap-3">
-                    <SearchBar value={searchUserQuery} onChange={setSearchUserQuery} placeholder="Search team users..." />
-                    <PrimaryButton icon={UserPlus} onClick={() => setShowInviteModal(true)}>
-                      Invite User
-                    </PrimaryButton>
-                  </div>
-
-                  <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl text-xs">
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-neutral-50 dark:bg-neutral-800/50 border-b text-neutral-600 dark:text-neutral-400 font-semibold">
-                        <tr>
-                          <th className="py-3 px-4">User Name</th>
-                          <th className="py-3 px-4">Email</th>
-                          <th className="py-3 px-4">Role</th>
-                          <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Last Login</th>
-                          <th className="py-3 px-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        {selectedTeam.membersList.map((m) => {
-                          const isUserMenuOpen = activeUserMenuId === m.id;
-                          return (
-                            <tr key={m.id} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40">
-                              <td className="py-3 px-4 font-bold flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-xs">
-                                  {m.name.charAt(0)}
-                                </div>
-                                {m.name}
-                              </td>
-                              <td className="py-3 px-4 text-neutral-500">{m.email}</td>
-                              <td className="py-3 px-4 font-semibold text-primary-600">{m.role}</td>
-                              <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border">{m.status}</span></td>
-                              <td className="py-3 px-4 text-neutral-500">{m.lastActive}</td>
-                              
-                              {/* Row Action Menu for My Users per Screenshot 1 */}
-                              <td className="py-3 px-4 text-right relative action-menu-container">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveUserMenuId(isUserMenuOpen ? null : m.id);
-                                  }}
-                                  className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                  title="Actions"
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </button>
-
-                                {isUserMenuOpen && (
-                                  <div className="absolute right-4 top-10 z-50 w-44 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-2xl py-1.5 text-left text-xs animate-fadeIn">
-                                    <button onClick={() => { setActiveUserMenuId(null); toast.info(`User: ${m.name} (${m.email})`); }} className="w-full px-3 py-2 hover:bg-neutral-50 flex items-center gap-2">
-                                      <Eye className="w-3.5 h-3.5 text-neutral-500" />
-                                      <span>View User</span>
-                                    </button>
-                                    <button onClick={() => { setActiveUserMenuId(null); setEditingMember(m); setEditMemberRole(m.role); setEditMemberBudget(m.budget.toString()); setShowEditMemberModal(true); }} className="w-full px-3 py-2 hover:bg-neutral-50 flex items-center gap-2">
-                                      <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
-                                      <span>Edit Role</span>
-                                    </button>
-                                    <button onClick={() => { setActiveUserMenuId(null); toast.warning(`User "${m.name}" deactivated.`); }} className="w-full px-3 py-2 hover:bg-amber-50 text-amber-600 flex items-center gap-2 font-medium">
-                                      <Ban className="w-3.5 h-3.5" />
-                                      <span>Deactivate</span>
-                                    </button>
-                                    <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
-                                    <button onClick={() => { setActiveUserMenuId(null); toast.success(`User "${m.name}" removed from team.`); }} className="w-full px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 font-medium">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                      <span>Remove from Team</span>
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: VIRTUAL KEYS TAB (FIXED FLOATING DROPDOWN DESIGN PER SCREENSHOT 2) */}
+              {/* TAB 2: VIRTUAL KEYS TAB */}
               {detailTab === "virtual-keys" && (
                 <div className="space-y-4 pt-2 animate-fadeIn">
                   <div className="flex items-center justify-between gap-3">
@@ -1184,15 +1279,15 @@ export default function TeamsManagement() {
                     </PrimaryButton>
                   </div>
 
-                  <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl text-xs">
+                  <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl text-xs overflow-hidden">
                     <table className="w-full text-left border-collapse">
-                      <thead className="bg-neutral-50 dark:bg-neutral-800/50 border-b text-neutral-600 dark:text-neutral-400 font-semibold">
+                      <thead className="bg-neutral-50/80 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-semibold">
                         <tr>
                           <th className="py-3 px-4">Key Alias</th>
                           <th className="py-3 px-4">Key ID</th>
                           <th className="py-3 px-4">Owner</th>
                           <th className="py-3 px-4">Key Type</th>
-                          <th className="py-3 px-4">Spend</th>
+                          <th className="py-3 px-4">Spend / Budget</th>
                           <th className="py-3 px-4">Status</th>
                           <th className="py-3 px-4 text-right">Actions</th>
                         </tr>
@@ -1200,76 +1295,134 @@ export default function TeamsManagement() {
                       <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
                         {selectedTeam.keysList.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-12 text-center text-neutral-400 space-y-2">
-                              <KeyRound className="w-10 h-10 mx-auto text-neutral-300" />
-                              <div className="font-bold">No Virtual Keys Configured</div>
-                              <p className="text-xs">Create a new key to allow API access for this team.</p>
+                            <td colSpan={7} className="py-12 text-center text-neutral-400 dark:text-neutral-500 space-y-3">
+                              <KeyRound className="w-10 h-10 mx-auto text-neutral-300 dark:text-neutral-700 stroke-1" />
+                              <div className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No Virtual Keys Provisioned</div>
+                              <p className="text-xs max-w-sm mx-auto">Create a new key to grant API gateway access for this team.</p>
                               <PrimaryButton icon={KeyRound} onClick={() => setShowCreateKeyModal(true)}>
                                 Create New Key
                               </PrimaryButton>
                             </td>
                           </tr>
                         ) : (
-                          selectedTeam.keysList.map((k) => {
-                            const isKeyMenuOpen = activeKeyMenuId === k.id;
-                            return (
-                              <tr key={k.id} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40">
-                                <td className="py-3 px-4 font-bold text-neutral-900 dark:text-white">{k.alias}</td>
-                                <td className="py-3 px-4 font-mono text-neutral-500">
-                                  <div className="flex items-center gap-1">
-                                    <span>{k.keyId}</span>
-                                    <button type="button" onClick={() => handleCopyText(k.keyId, "Key ID copied!")} className="p-0.5 hover:text-primary-600">
-                                      <Copy className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-neutral-500">{k.owner}</td>
-                                <td className="py-3 px-4 font-medium">{k.keyType}</td>
-                                <td className="py-3 px-4 font-mono font-semibold">${k.currentSpend.toFixed(2)} / ${k.budget.toFixed(2)}</td>
-                                <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border">{k.status}</span></td>
-                                
-                                {/* Fixed Clean Floating Row Action Menu per Screenshot 2 */}
-                                <td className="py-3 px-4 text-right relative action-menu-container">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveKeyMenuId(isKeyMenuOpen ? null : k.id);
-                                    }}
-                                    className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
-
-                                  {isKeyMenuOpen && (
-                                    <div className="absolute right-4 top-10 z-50 w-44 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-2xl py-1.5 text-left text-xs animate-fadeIn">
-                                      <button onClick={() => { setActiveKeyMenuId(null); handleCopyText(k.keyId, "Virtual Key details copied!"); }} className="w-full px-3 py-2 hover:bg-neutral-50 flex items-center gap-2">
-                                        <Eye className="w-3.5 h-3.5 text-neutral-500" />
-                                        <span>View Key</span>
-                                      </button>
-                                      <button onClick={() => { setActiveKeyMenuId(null); toast.success(`Key "${k.alias}" updated.`); }} className="w-full px-3 py-2 hover:bg-neutral-50 flex items-center gap-2">
-                                        <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
-                                        <span>Edit Key</span>
-                                      </button>
-                                      <button onClick={() => { setActiveKeyMenuId(null); toast.success(`Virtual Key "${k.alias}" Regenerated`); }} className="w-full px-3 py-2 hover:bg-neutral-50 text-blue-600 flex items-center gap-2 font-medium">
-                                        <RotateCw className="w-3.5 h-3.5" />
-                                        <span>Regenerate Key</span>
-                                      </button>
-                                      <button onClick={() => { setActiveKeyMenuId(null); toast.warning(`Virtual Key "${k.alias}" Disabled`); }} className="w-full px-3 py-2 hover:bg-amber-50 text-amber-600 flex items-center gap-2 font-medium">
-                                        <Ban className="w-3.5 h-3.5" />
-                                        <span>Disable Key</span>
-                                      </button>
-                                      <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
-                                      <button onClick={() => { setActiveKeyMenuId(null); toast.success(`Virtual Key "${k.alias}" Deleted`); }} className="w-full px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 font-medium">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        <span>Delete Key</span>
+                          selectedTeam.keysList
+                            .filter((k) => !searchKeyQuery || k.alias.toLowerCase().includes(searchKeyQuery.toLowerCase()) || k.keyId.toLowerCase().includes(searchKeyQuery.toLowerCase()))
+                            .map((k) => {
+                              const isKeyMenuOpen = activeKeyMenuId === k.id;
+                              return (
+                                <tr key={k.id} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40 transition-colors">
+                                  <td className="py-3.5 px-4 font-bold text-neutral-900 dark:text-white">{k.alias}</td>
+                                  <td className="py-3.5 px-4 font-mono text-neutral-500">
+                                    <div className="flex items-center gap-1">
+                                      <span>{k.keyId}</span>
+                                      <button type="button" onClick={() => handleCopyText(k.keyId, "Key ID copied!")} className="p-0.5 text-neutral-400 hover:text-primary-600 transition-colors" title="Copy Key ID">
+                                        <Copy className="w-3 h-3" />
                                       </button>
                                     </div>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })
+                                  </td>
+                                  <td className="py-3.5 px-4 text-neutral-500">{k.owner}</td>
+                                  <td className="py-3.5 px-4 font-medium">{k.keyType}</td>
+                                  <td className="py-3.5 px-4 font-mono font-semibold">${k.currentSpend.toFixed(2)} / ${k.budget.toFixed(2)}</td>
+                                  <td className="py-3.5 px-4">{renderStatusBadge(k.status as any)}</td>
+
+                                  <td className="py-3.5 px-4 text-right action-menu-container">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (activeKeyMenuId === k.id) {
+                                          setActiveKeyMenuId(null);
+                                          setKeyMenuPosition(null);
+                                        } else {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setKeyMenuPosition({
+                                            top: rect.bottom + 4,
+                                            left: Math.max(10, rect.right - 192)
+                                          });
+                                          setActiveKeyMenuId(k.id);
+                                        }
+                                      }}
+                                      className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                      title="Actions Menu"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </button>
+
+                                    {isKeyMenuOpen && keyMenuPosition && (
+                                      <div
+                                        style={{ position: "fixed", top: `${keyMenuPosition.top}px`, left: `${keyMenuPosition.left}px` }}
+                                        className="z-[9999] w-48 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-2xl py-1.5 text-left text-xs animate-fadeIn action-menu-container"
+                                      >
+                                        <button
+                                          onClick={() => {
+                                            setActiveKeyMenuId(null);
+                                            setKeyMenuPosition(null);
+                                            setSelectedVkKey(k);
+                                            setShowVkViewModal(true);
+                                          }}
+                                          className="w-full px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2 text-neutral-700 dark:text-neutral-300 font-medium transition-colors"
+                                        >
+                                          <Eye className="w-3.5 h-3.5 text-neutral-500" />
+                                          <span>View Key</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setActiveKeyMenuId(null);
+                                            setKeyMenuPosition(null);
+                                            setSelectedVkKey(k);
+                                            setVkEditAlias(k.alias);
+                                            setVkEditType(k.keyType);
+                                            setVkEditBudget(k.budget.toString());
+                                            setShowVkEditModal(true);
+                                          }}
+                                          className="w-full px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2 text-neutral-700 dark:text-neutral-300 font-medium transition-colors"
+                                        >
+                                          <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
+                                          <span>Edit Key</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setActiveKeyMenuId(null);
+                                            setKeyMenuPosition(null);
+                                            setSelectedVkKey(k);
+                                            setShowVkRegenerateModal(true);
+                                          }}
+                                          className="w-full px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-blue-600 flex items-center gap-2 font-medium transition-colors"
+                                        >
+                                          <RotateCw className="w-3.5 h-3.5" />
+                                          <span>Regenerate Key</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setActiveKeyMenuId(null);
+                                            setKeyMenuPosition(null);
+                                            setSelectedVkKey(k);
+                                            setShowVkDisableModal(true);
+                                          }}
+                                          className="w-full px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-600 flex items-center gap-2 font-medium transition-colors"
+                                        >
+                                          <Ban className="w-3.5 h-3.5" />
+                                          <span>{k.status === "Disabled" || k.status === "Blocked" ? "Enable Key" : "Disable Key"}</span>
+                                        </button>
+                                        <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
+                                        <button
+                                          onClick={() => {
+                                            setActiveKeyMenuId(null);
+                                            setKeyMenuPosition(null);
+                                            setSelectedVkKey(k);
+                                            setShowVkDeleteModal(true);
+                                          }}
+                                          className="w-full px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 flex items-center gap-2 font-medium transition-colors"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <span>Delete Key</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
                         )}
                       </tbody>
                     </table>
@@ -1277,7 +1430,7 @@ export default function TeamsManagement() {
                 </div>
               )}
 
-              {/* TAB 4: MEMBERS TAB (FIXED EDIT ACTION WIRED TO EDIT MEMBER MODAL PER SCREENSHOT 3) */}
+              {/* TAB 4: MEMBERS TAB */}
               {detailTab === "members" && (
                 <div className="space-y-4 pt-2 animate-fadeIn">
                   <div className="flex items-center justify-between gap-3">
@@ -1329,173 +1482,348 @@ export default function TeamsManagement() {
                   </div>
                 </div>
               )}
-
-              {/* TAB 5: MEMBER PERMISSIONS TAB (ALLOW ACCESS MOVED TO 1ST COLUMN PER TEXT PROMPT & SCREENSHOT 4) */}
-              {detailTab === "member-permissions" && (
-                <div className="space-y-4 pt-2 animate-fadeIn">
-                  <div className="flex items-center justify-between gap-3">
-                    <SearchBar value={searchPermQuery} onChange={setSearchPermQuery} placeholder="Search endpoint permissions..." />
-                    <div className="flex gap-2">
-                      <button onClick={() => toast.success("Enabled selected permissions")} className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 font-semibold rounded-lg text-xs">
-                        Enable Selected
-                      </button>
-                      <button onClick={() => toast.warning("Disabled selected permissions")} className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 font-semibold rounded-lg text-xs">
-                        Disable Selected
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden text-xs">
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-neutral-50 dark:bg-neutral-800/50 border-b text-neutral-600 dark:text-neutral-400 font-semibold">
-                        <tr>
-                          {/* Allow Access is now 1st Column per user request */}
-                          <th className="py-3 px-4 text-left w-32">Allow Access</th>
-                          <th className="py-3 px-4">Method</th>
-                          <th className="py-3 px-4">Endpoint</th>
-                          <th className="py-3 px-4">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        {permissionsList.map((p) => (
-                          <tr key={p.id} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40">
-                            {/* Allow Access Checkbox 1st Column */}
-                            <td className="py-3 px-4 text-left">
-                              <input
-                                type="checkbox"
-                                checked={p.access}
-                                onChange={(e) => {
-                                  setPermissionsList((prev) => prev.map((x) => (x.id === p.id ? { ...x, access: e.target.checked } : x)));
-                                  toast.success(`Permission for ${p.endpoint} updated.`);
-                                }}
-                                className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
-                              />
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${getMethodBadgeStyle(p.method)}`}>
-                                {p.method}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 font-mono font-medium">{p.endpoint}</td>
-                            <td className="py-3 px-4 text-neutral-500">{p.description}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: SETTINGS TAB */}
-              {detailTab === "settings" && (
-                <div className="space-y-6 pt-2 animate-fadeIn text-xs">
-                  <div className="flex items-center justify-between border-b pb-3">
-                    <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                      <SettingsIcon className="w-5 h-5 text-primary-600" />
-                      Team Configuration Settings
-                    </h3>
-                    <PrimaryButton
-                      icon={isEditingSettings ? Save : Edit3}
-                      onClick={() => {
-                        if (isEditingSettings) {
-                          setIsEditingSettings(false);
-                          toast.success("Team Settings Updated");
-                        } else {
-                          setIsEditingSettings(true);
-                        }
-                      }}
-                    >
-                      {isEditingSettings ? "Save Settings" : "Edit Settings"}
-                    </PrimaryButton>
-                  </div>
-
-                  {/* 10 Enterprise Accordion Cards */}
-                  <div className="space-y-4">
-                    <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 bg-neutral-50/50 space-y-3">
-                      <h4 className="font-bold text-neutral-900 dark:text-white text-xs uppercase tracking-wider">1. General Information</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-neutral-500 mb-1 font-semibold">Team Name</label>
-                          {isEditingSettings ? (
-                            <input type="text" defaultValue={selectedTeam.name} className="w-full h-9 px-3 border rounded-lg bg-white" />
-                          ) : (
-                            <div className="font-bold text-sm text-neutral-900 dark:text-white">{selectedTeam.name}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-neutral-500 mb-1 font-semibold">Organization</label>
-                          {isEditingSettings ? (
-                            <select defaultValue={selectedTeam.organization} className="w-full h-9 px-3 border rounded-lg bg-white">
-                              <option value="HB Enterprise">HB Enterprise</option>
-                              <option value="Spine CloudIQ">Spine CloudIQ</option>
-                            </select>
-                          ) : (
-                            <div className="font-bold text-sm text-neutral-900 dark:text-white">{selectedTeam.organization}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 bg-neutral-50/50 space-y-3">
-                      <h4 className="font-bold text-neutral-900 dark:text-white text-xs uppercase tracking-wider">2. Budget & Quota Thresholds</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-neutral-500 mb-1 font-semibold">Max Budget ($)</label>
-                          {isEditingSettings ? (
-                            <input type="number" defaultValue={selectedTeam.maxBudget} className="w-full h-9 px-3 border rounded-lg bg-white font-mono" />
-                          ) : (
-                            <div className="font-mono font-bold text-sm text-neutral-900 dark:text-white">${selectedTeam.maxBudget.toFixed(2)}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-neutral-500 mb-1 font-semibold">Budget Reset Cycle</label>
-                          {isEditingSettings ? (
-                            <select defaultValue={selectedTeam.budgetDuration} className="w-full h-9 px-3 border rounded-lg bg-white">
-                              <option value="Monthly">Monthly</option>
-                              <option value="Quarterly">Quarterly</option>
-                            </select>
-                          ) : (
-                            <div className="font-medium text-sm text-neutral-900 dark:text-white">{selectedTeam.budgetDuration}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-neutral-500 mb-1 font-semibold">Soft Budget Warning (%)</label>
-                          {isEditingSettings ? (
-                            <input type="number" defaultValue={selectedTeam.softBudgetPercent} className="w-full h-9 px-3 border rounded-lg bg-white font-mono" />
-                          ) : (
-                            <div className="font-mono font-bold text-sm text-neutral-900 dark:text-white">{selectedTeam.softBudgetPercent}%</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 bg-neutral-50/50 space-y-3">
-                      <h4 className="font-bold text-neutral-900 dark:text-white text-xs uppercase tracking-wider">3. Allowed Models & Aliases</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedTeam.allowedModels.map((m) => (
-                          <span key={m} className="px-2.5 py-1 rounded bg-purple-100 text-purple-800 font-mono text-[11px] font-semibold">
-                            {m}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {isEditingSettings && (
-                    <div className="p-4 bg-primary-50 border border-primary-200 rounded-xl flex items-center justify-between animate-fadeIn">
-                      <span className="font-semibold text-primary-900">You are currently editing Team Settings</span>
-                      <div className="flex gap-2">
-                        <button onClick={() => setIsEditingSettings(false)} className="px-3 py-1.5 bg-white border font-semibold rounded-lg">Cancel</button>
-                        <PrimaryButton onClick={() => { setIsEditingSettings(false); toast.success("Team Settings Updated"); }}>Save Changes</PrimaryButton>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )
-      )}
+      ) : viewState === "edit" ? (
+        /* ========================================================================= */
+        /* VIEW 3: DEDICATED EDIT TEAM PAGE                                         */
+        /* ========================================================================= */
+        selectedTeam && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Top Navigation & Header */}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setViewState("detail")}
+                className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Team Details
+              </button>
+
+              <div className="text-xs text-neutral-400">
+                Site Map &gt; Access Control &gt; Teams &gt; <span className="text-neutral-700 dark:text-neutral-300 font-medium">Edit Team</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 shadow-xs space-y-6">
+              <div className="flex items-center justify-between border-b pb-4 border-neutral-100 dark:border-neutral-800">
+                <div>
+                  <h2 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    <Edit3 className="w-5 h-5 text-primary-600" />
+                    Edit Team: {selectedTeam.name}
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Update team configurations, rate limits, budgets, and model access.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewState("detail")}
+                    className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <PrimaryButton
+                    icon={Save}
+                    onClick={() => {
+                      toast.success(`Team "${selectedTeam.name}" updated successfully.`);
+                      setViewState("detail");
+                    }}
+                  >
+                    Save Changes
+                  </PrimaryButton>
+                </div>
+              </div>
+
+              {/* Form Content */}
+              <div className="space-y-6 text-xs">
+                {/* Basic Information */}
+                <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 bg-neutral-50/50 space-y-4">
+                  <h4 className="font-bold text-neutral-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary-600" /> Basic Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Team Name *</label>
+                      <input
+                        type="text"
+                        defaultValue={selectedTeam.name}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, name: e.target.value };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-semibold focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Team Description</label>
+                      <input
+                        type="text"
+                        defaultValue={selectedTeam.description}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, description: e.target.value };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-medium focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Budget & Quota Thresholds */}
+                <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 bg-neutral-50/50 space-y-4">
+                  <h4 className="font-bold text-neutral-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-600" /> Budget & Quota Thresholds
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Max Budget ($)</label>
+                      <input
+                        type="number"
+                        defaultValue={selectedTeam.maxBudget}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, maxBudget: parseFloat(e.target.value) || 0 };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-mono font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Budget Reset Cycle</label>
+                      <select
+                        defaultValue={selectedTeam.budgetDuration}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, budgetDuration: e.target.value as any };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-medium"
+                      >
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Annual">Annual</option>
+                        <option value="Infinite">Infinite</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Soft Warning Threshold (%)</label>
+                      <input
+                        type="number"
+                        defaultValue={selectedTeam.softBudgetPercent}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, softBudgetPercent: parseInt(e.target.value) || 80 };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-mono font-semibold"
+                      />
+                    </div>
+
+                    {/* Alert Email Recipients */}
+                    <MultiEmailInput
+                      emails={selectedTeam.alertEmails || ["john@company.com", "sarah@company.com", "finance@company.com"]}
+                      onChange={(newEmails) => {
+                        const updated = { ...selectedTeam, alertEmails: newEmails };
+                        setSelectedTeam(updated);
+                        setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                      }}
+                      label="Notification Email Recipients"
+                      helpText="Recipients receive email notifications when Soft Budget or Maximum Budget threshold is reached."
+                    />
+                  </div>
+                </div>
+
+                {/* Rate Limits */}
+                <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 bg-neutral-50/50 space-y-4">
+                  <h4 className="font-bold text-neutral-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" /> Rate Limits (TPM / RPM)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Tokens Per Minute (TPM)</label>
+                      <input
+                        type="number"
+                        defaultValue={selectedTeam.tpmLimit}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, tpmLimit: parseInt(e.target.value) || 500000 };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-mono font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-neutral-700 dark:text-neutral-300 font-semibold mb-1">Requests Per Minute (RPM)</label>
+                      <input
+                        type="number"
+                        defaultValue={selectedTeam.rpmLimit}
+                        onChange={(e) => {
+                          const updated = { ...selectedTeam, rpmLimit: parseInt(e.target.value) || 5000 };
+                          setSelectedTeam(updated);
+                          setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                        }}
+                        className="w-full h-10 px-3 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-950 text-xs font-mono font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      ) : viewState === "audit-log" ? (
+        /* ========================================================================= */
+        /* VIEW 4: TEAM AUDIT LOG WORKSPACE (REUSING VIRTUAL KEY DETAILS -> LOGS)   */
+        /* ========================================================================= */
+        selectedTeam && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Top Navigation & Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-4">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setViewState("detail")}
+                  className="p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  title="Back to Team Details"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div>
+                  <div className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Site Map</span>
+                    <span>/</span>
+                    <span>Access Control</span>
+                    <span>/</span>
+                    <span>Teams</span>
+                    <span>/</span>
+                    <span className="text-primary-600 dark:text-primary-400 font-bold">Audit Log</span>
+                  </div>
+                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2 mt-0.5">
+                    <FileText className="w-5 h-5 text-primary-600" />
+                    Audit Log: {selectedTeam.name}
+                  </h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewState("detail")}
+                  className="px-3.5 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors"
+                >
+                  Back to Team Details
+                </button>
+              </div>
+            </div>
+
+            {/* Top Toolbar matching Virtual Key Details -> Logs Tab */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3.5 rounded-xl">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={teamAuditSearch}
+                    onChange={(e) => setTeamAuditSearch(e.target.value)}
+                    placeholder="Search team audit logs by IP, user, action..."
+                    className="h-9 pl-8 pr-3 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg w-64 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+                <select
+                  value={teamAuditActionFilter}
+                  onChange={(e) => setTeamAuditActionFilter(e.target.value)}
+                  className="h-9 px-3 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg font-medium text-neutral-800 dark:text-neutral-200 focus:outline-none"
+                >
+                  <option value="All">All Actions</option>
+                  <option value="Team Config">Team Config</option>
+                  <option value="Budget Update">Budget Checks</option>
+                  <option value="Key Operations">Key Operations</option>
+                  <option value="User Access">User Access</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <IconButton icon={Download} label="Export" onClick={() => toast.success("Exporting Team audit logs CSV...")} />
+                <IconButton icon={RefreshCw} label="Refresh" onClick={() => toast.success("Team audit logs refreshed")} />
+              </div>
+            </div>
+
+            {/* Audit Logs HB Enterprise Table matching Virtual Key Details -> Logs */}
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-800 font-semibold text-neutral-600 dark:text-neutral-400">
+                      <th className="py-3 px-4">Date & Time</th>
+                      <th className="py-3 px-4">User</th>
+                      <th className="py-3 px-4">Action</th>
+                      <th className="py-3 px-4">IP Address</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    {filteredTeamLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-neutral-400 dark:text-neutral-500 space-y-2">
+                          <FileText className="w-8 h-8 mx-auto stroke-1 text-neutral-300 dark:text-neutral-700" />
+                          <div className="font-semibold text-neutral-700 dark:text-neutral-300">No Audit Logs Found</div>
+                          <p className="text-xs">No audit events matched your search or action filter criteria.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTeamLogs.map((l) => (
+                        <tr key={l.id} className="hover:bg-neutral-50/60 dark:hover:bg-neutral-800/30 transition-colors">
+                          <td className="py-3 px-4 font-mono text-[11px] text-neutral-500">{l.date}</td>
+                          <td className="py-3 px-4 font-medium text-neutral-900 dark:text-white">{l.user}</td>
+                          <td className="py-3 px-4 font-semibold text-primary-600 dark:text-primary-400">{l.action}</td>
+                          <td className="py-3 px-4 font-mono text-[11px] text-neutral-500">{l.ip}</td>
+                          <td className="py-3 px-4">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              {l.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-neutral-600 dark:text-neutral-400">{l.description}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Table Footer & Pagination */}
+              <div className="px-4 py-3 bg-neutral-50/60 dark:bg-neutral-800/40 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500">
+                <div>
+                  Showing <span className="font-semibold text-neutral-800 dark:text-neutral-200">{filteredTeamLogs.length}</span> audit logs for <span className="font-semibold text-neutral-800 dark:text-neutral-200">{selectedTeam.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={teamAuditPage === 1}
+                    onClick={() => setTeamAuditPage((p) => Math.max(1, p - 1))}
+                    className="px-2.5 py-1 border border-neutral-300 dark:border-neutral-700 rounded text-xs disabled:opacity-40 font-medium hover:bg-neutral-100 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">Page {teamAuditPage} of 1</span>
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="px-2.5 py-1 border border-neutral-300 dark:border-neutral-700 rounded text-xs disabled:opacity-40 font-medium"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      ) : null}
 
       {/* EDIT MEMBER MODAL (Fix for Screenshot 3) */}
       {showEditMemberModal && editingMember && (
@@ -1552,60 +1880,112 @@ export default function TeamsManagement() {
         </div>
       )}
 
-      {/* CREATE VIRTUAL KEY MODAL */}
+      {/* CREATE VIRTUAL KEY MODAL (Reusing Virtual Key Workflow Modal) */}
       {showCreateKeyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-base font-bold flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-amber-600" /> Create Virtual Key
-              </h3>
-              <button onClick={() => setShowCreateKeyModal(false)}><X className="w-5 h-5 text-neutral-400" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] overflow-hidden my-auto text-xs">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/60 text-amber-600 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                    Create Virtual Key
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Generate a new API key for {selectedTeam?.name || "Team"} to route LLM requests.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateKeyModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block font-semibold mb-1">Key Alias *</label>
-                <input
-                  type="text"
-                  value={keyFormAlias}
-                  onChange={(e) => setKeyFormAlias(e.target.value)}
-                  placeholder="e.g. prod-service-key"
-                  className="w-full h-10 px-3 border rounded-lg"
-                />
-              </div>
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1">Key Alias / Name *</label>
+                  <input
+                    type="text"
+                    value={keyFormAlias}
+                    onChange={(e) => setKeyFormAlias(e.target.value)}
+                    placeholder="e.g. prod-service-key"
+                    className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-semibold mb-1">Key Type</label>
-                <select
-                  value={keyFormType}
-                  onChange={(e: any) => setKeyFormType(e.target.value)}
-                  className="w-full h-10 px-3 border rounded-lg"
-                >
-                  <option value="AI APIs">AI APIs</option>
-                  <option value="Management">Management</option>
-                  <option value="Full Access">Full Access</option>
-                </select>
-              </div>
+                <div>
+                  <label className="block font-semibold mb-1">Key Type *</label>
+                  <select
+                    value={keyFormType}
+                    onChange={(e: any) => setKeyFormType(e.target.value)}
+                    className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                  >
+                    <option value="AI APIs">AI APIs (LLM Proxy Access)</option>
+                    <option value="Management">Management (API Gateway Admin)</option>
+                    <option value="Full Access">Full Access (Admin + AI Proxy)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block font-semibold mb-1">Max Budget ($)</label>
-                <input
-                  type="number"
-                  value={keyFormBudget}
-                  onChange={(e) => setKeyFormBudget(e.target.value)}
-                  className="w-full h-10 px-3 border rounded-lg font-mono"
-                  placeholder="500"
-                />
+                <div>
+                  <label className="block font-semibold mb-1">Assigned Team</label>
+                  <div className="h-10 px-3 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-xs font-semibold flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                    <Users className="w-3.5 h-3.5 text-neutral-400" />
+                    {selectedTeam?.name || "HB Enterprise Team"}
+                    <span className="ml-auto text-[10px] bg-neutral-200 dark:bg-neutral-700 px-2 py-0.5 rounded text-neutral-500">Auto</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">Owner Email</label>
+                  <div className="h-10 px-3 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-xs font-mono font-medium flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                    <Mail className="w-3.5 h-3.5 text-neutral-400" />
+                    {selectedTeam?.ownerEmail || "john.doe@company.com"}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">Max Budget Cap ($)</label>
+                  <input
+                    type="number"
+                    value={keyFormBudget}
+                    onChange={(e) => setKeyFormBudget(e.target.value)}
+                    className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono font-semibold"
+                    placeholder="500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">Expiration Duration</label>
+                  <select className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium">
+                    <option value="Never">Never (No Expiration)</option>
+                    <option value="30 Days">30 Days</option>
+                    <option value="90 Days">90 Days</option>
+                    <option value="1 Year">1 Year</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <button onClick={() => setShowCreateKeyModal(false)} className="px-4 py-2 font-semibold text-neutral-600">
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-neutral-200 dark:border-neutral-800 flex justify-end gap-2 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <button
+                type="button"
+                onClick={() => setShowCreateKeyModal(false)}
+                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 transition-colors"
+              >
                 Cancel
               </button>
-              <PrimaryButton onClick={handleCreateKeySubmit}>
-                Create Key
+              <PrimaryButton icon={KeyRound} onClick={handleCreateKeySubmit}>
+                Create Virtual Key
               </PrimaryButton>
             </div>
           </div>
@@ -1910,6 +2290,14 @@ export default function TeamsManagement() {
                       <option value="Infinite">Infinite (Never)</option>
                     </select>
                   </div>
+
+                  {/* Alert Email Recipients */}
+                  <MultiEmailInput
+                    emails={formAlertEmails}
+                    onChange={setFormAlertEmails}
+                    label="Notification Email Recipients"
+                    helpText="Recipients receive email notifications when Soft Budget or Maximum Budget threshold is reached."
+                  />
                 </div>
               </div>
 
@@ -2003,25 +2391,6 @@ export default function TeamsManagement() {
               </div>
 
               <div className="space-y-5 text-xs">
-                {/* Organization Filter */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-neutral-800 dark:text-neutral-200 block">
-                    Organization
-                  </label>
-                  <select
-                    value={filterOrg}
-                    onChange={(e) => setFilterOrg(e.target.value)}
-                    className="w-full h-10 px-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg font-medium text-xs text-neutral-900 dark:text-white"
-                  >
-                    <option value="All">All Organizations</option>
-                    <option value="HB Enterprise">HB Enterprise</option>
-                    <option value="Spine CloudIQ">Spine CloudIQ</option>
-                    <option value="CyberShield Ltd">CyberShield Ltd</option>
-                    <option value="FinTech Solutions">FinTech Solutions</option>
-                    <option value="HealthCare AI">HealthCare AI</option>
-                  </select>
-                </div>
-
                 {/* Status Filter */}
                 <div className="space-y-1.5">
                   <label className="font-semibold text-neutral-800 dark:text-neutral-200 block">
@@ -2067,7 +2436,6 @@ export default function TeamsManagement() {
               <button
                 type="button"
                 onClick={() => {
-                  setFilterOrg("All");
                   setFilterStatus("All");
                   setFilterModel("All");
                   toast.info("Filters reset to default.");
@@ -2084,6 +2452,326 @@ export default function TeamsManagement() {
               >
                 Apply Filters
               </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VIRTUAL KEY ACTION MODALS (REUSED WORKFLOWS FOR VIEW, EDIT, REGENERATE, DISABLE, DELETE) */}
+      {/* ========================================================================= */}
+
+      {/* 1. VIEW VIRTUAL KEY MODAL */}
+      {showVkViewModal && selectedVkKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 text-xs">
+            <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200/60 text-amber-600 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">Virtual Key Details</h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-neutral-500 font-mono">{selectedVkKey.keyId}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(selectedVkKey.keyId, "Key ID copied successfully.")}
+                      className="p-1 text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors rounded hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      title="Copy Key ID"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowVkViewModal(false)} className="text-neutral-400 hover:text-neutral-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800">
+                  <span className="text-[11px] text-neutral-400 font-medium block mb-0.5">Key Alias / Name</span>
+                  <div className="font-bold text-neutral-900 dark:text-white text-sm">{selectedVkKey.alias}</div>
+                </div>
+                <div className="bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800">
+                  <span className="text-[11px] text-neutral-400 font-medium block mb-0.5">Key Type</span>
+                  <div className="font-bold text-neutral-900 dark:text-white text-sm">{selectedVkKey.keyType}</div>
+                </div>
+              </div>
+
+              <div className="bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800 space-y-1">
+                <span className="text-[11px] text-neutral-400 font-medium block">Owner</span>
+                <div className="font-mono font-medium text-neutral-800 dark:text-neutral-200">{selectedVkKey.owner}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800">
+                  <span className="text-[11px] text-neutral-400 font-medium block mb-0.5">Current Spend</span>
+                  <div className="font-mono font-bold text-emerald-600">${selectedVkKey.currentSpend.toFixed(2)}</div>
+                </div>
+                <div className="bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800">
+                  <span className="text-[11px] text-neutral-400 font-medium block mb-0.5">Budget Cap</span>
+                  <div className="font-mono font-bold text-neutral-900 dark:text-white">${selectedVkKey.budget.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-neutral-100 dark:border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setShowVkViewModal(false)}
+                className="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 font-semibold rounded-lg text-xs transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. EDIT VIRTUAL KEY MODAL */}
+      {showVkEditModal && selectedVkKey && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-primary-600" /> Edit Virtual Key
+              </h3>
+              <button type="button" onClick={() => setShowVkEditModal(false)} className="text-neutral-400 hover:text-neutral-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              {/* Read-Only Key ID Field */}
+              <div className="bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700/80 rounded-xl p-3 space-y-1">
+                <label className="block text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                  Key ID
+                </label>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold text-neutral-900 dark:text-white select-all">
+                    {selectedVkKey.keyId}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(selectedVkKey.keyId, "Key ID copied successfully.")}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-700 rounded transition-colors"
+                    title="Copy Key ID"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-neutral-800 dark:text-neutral-200">Key Alias *</label>
+                <input
+                  type="text"
+                  value={vkEditAlias}
+                  onChange={(e) => setVkEditAlias(e.target.value)}
+                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-neutral-800 dark:text-neutral-200">Key Type</label>
+                <select
+                  value={vkEditType}
+                  onChange={(e: any) => setVkEditType(e.target.value)}
+                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium"
+                >
+                  <option value="AI APIs">AI APIs</option>
+                  <option value="Management">Management</option>
+                  <option value="Full Access">Full Access</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1 text-neutral-800 dark:text-neutral-200">Budget Cap ($)</label>
+                <input
+                  type="number"
+                  value={vkEditBudget}
+                  onChange={(e) => setVkEditBudget(e.target.value)}
+                  className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setShowVkEditModal(false)}
+                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold text-neutral-700 dark:text-neutral-300"
+              >
+                Cancel
+              </button>
+              <PrimaryButton
+                onClick={() => {
+                  const updatedKeys = selectedTeam.keysList.map((k) =>
+                    k.id === selectedVkKey.id
+                      ? { ...k, alias: vkEditAlias || k.alias, keyType: vkEditType, budget: parseFloat(vkEditBudget) || k.budget }
+                      : k
+                  );
+                  const updatedTeam = { ...selectedTeam, keysList: updatedKeys };
+                  setSelectedTeam(updatedTeam);
+                  setTeams((prev) => prev.map((t) => (t.id === updatedTeam.id ? updatedTeam : t)));
+                  setShowVkEditModal(false);
+                  toast.success(`Virtual Key "${vkEditAlias}" updated successfully.`);
+                }}
+              >
+                Save Changes
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. REGENERATE VIRTUAL KEY MODAL */}
+      {showVkRegenerateModal && selectedVkKey && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex items-center gap-3 border-b pb-3 border-neutral-100 dark:border-neutral-800">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 text-blue-600 flex items-center justify-center">
+                <RotateCw className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-neutral-900 dark:text-white">Regenerate Virtual Key</h3>
+                <p className="text-xs text-neutral-500">Generate a fresh API key token string.</p>
+              </div>
+            </div>
+
+            <p className="text-neutral-600 dark:text-neutral-400">
+              Are you sure you want to regenerate key <strong>"{selectedVkKey.alias}"</strong>? The current key secret will be immediately invalidated and replaced with a new token.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setShowVkRegenerateModal(false)}
+                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const freshKeyId = `vk-sec-${Math.random().toString(36).slice(2, 10)}`;
+                  const updatedKeys = selectedTeam.keysList.map((k) =>
+                    k.id === selectedVkKey.id ? { ...k, keyId: freshKeyId } : k
+                  );
+                  const updatedTeam = { ...selectedTeam, keysList: updatedKeys };
+                  setSelectedTeam(updatedTeam);
+                  setTeams((prev) => prev.map((t) => (t.id === updatedTeam.id ? updatedTeam : t)));
+                  setShowVkRegenerateModal(false);
+                  toast.success(`Virtual Key "${selectedVkKey.alias}" regenerated successfully.`);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Regenerate Key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. DISABLE / ENABLE VIRTUAL KEY MODAL */}
+      {showVkDisableModal && selectedVkKey && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex items-center gap-3 border-b pb-3 border-neutral-100 dark:border-neutral-800">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 text-amber-600 flex items-center justify-center">
+                <Ban className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                  {selectedVkKey.status === "Disabled" || selectedVkKey.status === "Blocked" ? "Enable Virtual Key" : "Disable Virtual Key"}
+                </h3>
+                <p className="text-xs text-neutral-500">Toggle active status for this virtual key.</p>
+              </div>
+            </div>
+
+            <p className="text-neutral-600 dark:text-neutral-400">
+              Are you sure you want to {selectedVkKey.status === "Disabled" || selectedVkKey.status === "Blocked" ? "enable" : "disable"} key <strong>"{selectedVkKey.alias}"</strong>?
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setShowVkDisableModal(false)}
+                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const newStatus = selectedVkKey.status === "Disabled" || selectedVkKey.status === "Blocked" ? "Active" : "Disabled";
+                  const updatedKeys = selectedTeam.keysList.map((k) =>
+                    k.id === selectedVkKey.id ? { ...k, status: newStatus as any } : k
+                  );
+                  const updatedTeam = { ...selectedTeam, keysList: updatedKeys };
+                  setSelectedTeam(updatedTeam);
+                  setTeams((prev) => prev.map((t) => (t.id === updatedTeam.id ? updatedTeam : t)));
+                  setShowVkDisableModal(false);
+                  toast.success(`Virtual Key "${selectedVkKey.alias}" ${newStatus === "Active" ? "enabled" : "disabled"} successfully.`);
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. DELETE VIRTUAL KEY MODAL */}
+      {showVkDeleteModal && selectedVkKey && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+            <div className="flex items-center gap-3 border-b pb-3 border-neutral-100 dark:border-neutral-800">
+              <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 text-rose-600 flex items-center justify-center">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-rose-600">Delete Virtual Key</h3>
+                <p className="text-xs text-neutral-500">Permanently delete this virtual key record.</p>
+              </div>
+            </div>
+
+            <p className="text-neutral-600 dark:text-neutral-400">
+              Are you sure you want to delete virtual key <strong>"{selectedVkKey.alias}"</strong>? This action cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setShowVkDeleteModal(false)}
+                className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const updatedKeys = selectedTeam.keysList.filter((k) => k.id !== selectedVkKey.id);
+                  const updatedTeam = {
+                    ...selectedTeam,
+                    keysList: updatedKeys,
+                    virtualKeysCount: updatedKeys.length
+                  };
+                  setSelectedTeam(updatedTeam);
+                  setTeams((prev) => prev.map((t) => (t.id === updatedTeam.id ? updatedTeam : t)));
+                  setShowVkDeleteModal(false);
+                  toast.success(`Virtual Key "${selectedVkKey.alias}" deleted successfully.`);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Delete Key
+              </button>
             </div>
           </div>
         </div>

@@ -1585,9 +1585,25 @@ export function GlobalHeader({
 
                 {/* Menu Items */}
                 <div className="p-1">
-                  <button className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded transition-colors flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      onNavigate?.("my-profile");
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded transition-colors flex items-center gap-2"
+                  >
                     <User className="w-4 h-4" />
                     <span>My Profile</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      onNavigate?.("organizations");
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded transition-colors flex items-center gap-2"
+                  >
+                    <Building2 className="w-4 h-4" />
+                    <span>Organization Details</span>
                   </button>
                   <button
                     onClick={() => setShowChangePasswordModal(true)}

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { PageHeader, SecondaryButton, PrimaryButton } from './hb/listing';
 import { toast } from 'sonner';
+import { MultiEmailInput } from './TeamsManagement';
 
 export interface UserEditProps {
   user: any;
@@ -103,12 +104,11 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
   const initialBudgetUsd = user?.budgetUsd !== undefined ? user.budgetUsd : 500;
   const [unlimitedBudget, setUnlimitedBudget] = useState(initialBudgetUsd === null);
   const [maxBudget, setMaxBudget] = useState(initialBudgetUsd !== null ? String(initialBudgetUsd) : "500");
-  const [budgetResetDuration, setBudgetResetDuration] = useState(user?.budgetDuration || "Monthly");
-
-  // Metadata
-  const [metadataText, setMetadataText] = useState(
-    user?.metadata ? JSON.stringify(user.metadata, null, 2) : '{\n  "department": "AI R&D",\n  "cost_center": "CC-904"\n}'
+  const [softBudget, setSoftBudget] = useState(user?.softBudgetUsd !== undefined ? String(user.softBudgetUsd) : "400");
+  const [notificationEmails, setNotificationEmails] = useState<string[]>(
+    user?.notificationEmails || [userEmail, "finance@company.com"]
   );
+  const [budgetResetDuration, setBudgetResetDuration] = useState(user?.budgetDuration || "Monthly");
 
   // Form Interactions
   const [touched, setTouched] = useState(false);
@@ -136,19 +136,9 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
     return maxBudget.trim() !== '' && !isNaN(Number(maxBudget)) && Number(maxBudget) >= 0;
   }, [unlimitedBudget, maxBudget]);
 
-  const isMetadataValid = useMemo(() => {
-    if (!metadataText.trim()) return true;
-    try {
-      JSON.parse(metadataText);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [metadataText]);
-
   const isFormValid = useMemo(() => {
-    return isAliasValid && roleOption !== null && isBudgetValid && isMetadataValid;
-  }, [isAliasValid, roleOption, isBudgetValid, isMetadataValid]);
+    return isAliasValid && roleOption !== null && isBudgetValid;
+  }, [isAliasValid, roleOption, isBudgetValid]);
 
   // Submit Handler
   const handleSave = () => {
@@ -286,16 +276,16 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
               />
             </div>
 
-            {/* Editable: User Alias */}
+            {/* Editable: Full Name */}
             <div className="space-y-1">
               <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                User Alias <span className="text-rose-500">*</span>
+                Full Name <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 value={userAlias}
                 onChange={(e) => setUserAlias(e.target.value)}
-                placeholder="e.g. HB Admin"
+                placeholder="e.g. John Doe"
                 className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-semibold text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none transition-all ${
                   touched && !isAliasValid
                     ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20"
@@ -305,7 +295,7 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
               {touched && !isAliasValid && (
                 <p className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  User Alias is required.
+                  Full Name is required.
                 </p>
               )}
             </div>
@@ -529,7 +519,7 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
             </label>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
                 Max Budget ($ USD) {!unlimitedBudget && <span className="text-rose-500">*</span>}
@@ -556,6 +546,20 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
 
             <div className="space-y-1">
               <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                Soft Budget ($ USD)
+              </label>
+              <input
+                type="number"
+                disabled={unlimitedBudget}
+                value={unlimitedBudget ? '' : softBudget}
+                onChange={(e) => setSoftBudget(e.target.value)}
+                placeholder={unlimitedBudget ? "Unlimited" : "400"}
+                className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-mono font-semibold text-neutral-900 dark:text-white disabled:opacity-50 disabled:bg-neutral-100 dark:disabled:bg-neutral-900"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
                 Budget Reset Duration
               </label>
               <select
@@ -572,31 +576,15 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
               </select>
             </div>
           </div>
-        </div>
 
-        {/* SECTION 5 — METADATA */}
-        <div className="lg:col-span-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-2xs space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
-            <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Metadata Payload (Optional JSON)</h3>
-          </div>
-
-          <div className="space-y-1">
-            <textarea
-              rows={4}
-              value={metadataText}
-              onChange={(e) => setMetadataText(e.target.value)}
-              placeholder='{\n  "department": "AI R&D",\n  "cost_center": "CC-904"\n}'
-              className={`w-full p-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-mono text-neutral-900 dark:text-white focus:outline-none ${
-                !isMetadataValid ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700"
-              }`}
+          {/* Budget Notification Emails */}
+          <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800">
+            <MultiEmailInput
+              emails={notificationEmails}
+              onChange={setNotificationEmails}
+              label="Notification Emails"
+              helpText="Recipients receive email notifications when Soft Budget or Maximum Budget threshold is reached."
             />
-            {!isMetadataValid && (
-              <p className="text-[11px] text-rose-500 font-medium flex items-center gap-1 mt-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                Invalid JSON format syntax.
-              </p>
-            )}
           </div>
         </div>
       </div>

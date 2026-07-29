@@ -82,7 +82,7 @@ export const translations: Record<Language, TranslationDict> = {
       dashboard: "Dashboard",
       accessControl: "Access Control",
       teams: "Teams",
-      internalUsers: "Internal Users",
+      internalUsers: "Users",
       organizations: "Organizations",
       aiGateway: "AI Gateway",
       virtualKey: "Virtual Key",

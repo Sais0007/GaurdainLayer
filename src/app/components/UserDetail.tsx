@@ -61,6 +61,8 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
   // Spend & Budget
   const spendUsd = typeof user?.spendUsd === 'number' ? user.spendUsd : 142.50;
   const budgetUsd = user?.budgetUsd !== undefined ? user.budgetUsd : 500.00; // null = Unlimited
+  const softBudgetUsd = user?.softBudgetUsd !== undefined ? user.softBudgetUsd : 400.00;
+  const notificationEmails: string[] = user?.notificationEmails || [userEmail, "finance@company.com"];
   const budgetDuration = user?.budgetDuration || "Monthly";
 
   // Teams list
@@ -348,7 +350,6 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
                     <thead>
                       <tr className="bg-neutral-50/60 dark:bg-neutral-900/60 border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 font-semibold">
                         <th className="py-2.5 px-3">Team Name</th>
-                        <th className="py-2.5 px-3">Member Role</th>
                         <th className="py-2.5 px-3 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -359,22 +360,14 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
                             <Building2 className="w-3.5 h-3.5 text-neutral-400" />
                             <span>{team.name}</span>
                           </td>
-                          <td className="py-3 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              team.role === 'Admin'
-                                ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
-                                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
-                            }`}>
-                              {team.role}
-                            </span>
-                          </td>
                           <td className="py-3 px-3 text-right">
                             <button
                               type="button"
                               onClick={() => handleRemoveTeam(team.id, team.name)}
-                              className="text-rose-600 dark:text-rose-400 hover:text-rose-700 text-xs font-semibold hover:underline"
+                              className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors inline-flex items-center justify-center"
+                              title="Remove from Team"
                             >
-                              Remove
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </td>
                         </tr>
@@ -452,7 +445,7 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
               </div>
 
               <div className="space-y-1">
-                <div className="text-neutral-400 font-medium">User Alias</div>
+                <div className="text-neutral-400 font-medium">Full Name</div>
                 <div className="font-semibold text-neutral-900 dark:text-white">{userName}</div>
               </div>
 
@@ -497,7 +490,7 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
               <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Budget Configuration</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1">
                 <div className="text-neutral-400 font-medium">Maximum Budget</div>
                 <div>
@@ -514,29 +507,46 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
               </div>
 
               <div className="space-y-1">
+                <div className="text-neutral-400 font-medium">Soft Budget ($)</div>
+                <div>
+                  {budgetUsd === null ? (
+                    <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      Unlimited
+                    </span>
+                  ) : (
+                    <span className="font-mono font-bold text-neutral-900 dark:text-white text-sm">
+                      ${softBudgetUsd.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1">
                 <div className="text-neutral-400 font-medium">Budget Reset Duration</div>
                 <div className="font-semibold text-neutral-900 dark:text-white">{budgetDuration}</div>
               </div>
             </div>
-          </div>
 
-          {/* SECTION 4 — METADATA */}
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-shadow space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
-              <Code2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <h3 className="font-bold text-sm text-neutral-900 dark:text-white">User Metadata</h3>
+            {/* Notification Emails */}
+            <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-2">
+              <div className="text-neutral-400 font-medium">Notification Emails</div>
+              <div className="flex flex-wrap gap-2">
+                {notificationEmails.map((email: string) => (
+                  <span
+                    key={email}
+                    className="px-2.5 py-1 rounded-md bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-semibold text-xs flex items-center gap-1.5"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-purple-500" />
+                    {email}
+                  </span>
+                ))}
+              </div>
             </div>
-
-            {userMetadata && Object.keys(userMetadata).length > 0 ? (
-              <pre className="p-4 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl font-mono text-xs text-neutral-900 dark:text-neutral-200 overflow-x-auto">
-                {JSON.stringify(userMetadata, null, 2)}
-              </pre>
-            ) : (
-              <div className="text-neutral-400 italic">No Metadata</div>
-            )}
           </div>
         </div>
       )}
+
+      {/* 5. TAB 2: DETAILS TAB (READ-ONLY) END */}
 
       {/* -------------------- MODAL 1: ADD USER TO TEAM MODAL -------------------- */}
       {showAddTeamModal && (
@@ -600,40 +610,6 @@ export default function UserDetail({ user, onBack }: UserDetailProps) {
                     ))}
                   </div>
                 )}
-              </div>
-
-              {/* Member Role Dropdown */}
-              <div className="space-y-1">
-                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                  Member Role <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAddTeamRole('User')}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      addTeamRole === 'User'
-                        ? "bg-primary-50 dark:bg-primary-950/50 border-primary-400 text-primary-700 dark:text-primary-300 font-semibold"
-                        : "bg-white dark:bg-neutral-950 border-neutral-200 text-neutral-600"
-                    }`}
-                  >
-                    <div className="font-bold">User</div>
-                    <div className="text-[10px] text-neutral-400 font-normal mt-0.5">Standard model access</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAddTeamRole('Admin')}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      addTeamRole === 'Admin'
-                        ? "bg-purple-50 dark:bg-purple-950/50 border-purple-400 text-purple-700 dark:text-purple-300 font-semibold"
-                        : "bg-white dark:bg-neutral-950 border-neutral-200 text-neutral-600"
-                    }`}
-                  >
-                    <div className="font-bold">Admin</div>
-                    <div className="text-[10px] text-neutral-400 font-normal mt-0.5">Full team management</div>
-                  </button>
-                </div>
               </div>
             </div>
 

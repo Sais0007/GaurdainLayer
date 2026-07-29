@@ -57,8 +57,10 @@ export function BreadcrumbItem({ children, href, current = false, onClick }: Bre
         <a 
           href={href || "#"}
           onClick={(e) => {
-            if (onClick) {
+            if (!href || href === "#" || onClick) {
               e.preventDefault();
+            }
+            if (onClick) {
               onClick();
             }
           }}

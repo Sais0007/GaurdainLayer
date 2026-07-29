@@ -20,8 +20,11 @@ import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import VirtualKeyManagement from "./components/VirtualKeyManagement";
 import OrganizationManagement from "./components/OrganizationManagement";
+import CredentialsManagement from "./components/CredentialsManagement";
+import ModelManagement from "./components/ModelManagement";
 import { ErrorBoundary } from "./components/hb/common/ErrorBoundary";
 import TeamsManagement from "./components/TeamsManagement";
+import MyProfile from "./components/MyProfile";
 import { FeedbackSystem } from "./components/FeedbackSystem";
 import { GlobalFooter } from "./components/GlobalFooter";
 import { LanguageProvider } from "../i18n/LanguageContext";
@@ -188,6 +191,14 @@ export default function App() {
               <ErrorBoundary moduleName="Organizations">
                 <OrganizationManagement />
               </ErrorBoundary>
+            ) : currentPage === "credentials-management" ? (
+              <ErrorBoundary moduleName="Credentials Management">
+                <CredentialsManagement />
+              </ErrorBoundary>
+            ) : currentPage === "model-management" ? (
+              <ErrorBoundary moduleName="Model Management">
+                <ModelManagement />
+              </ErrorBoundary>
             ) : currentPage === "virtual-key" || currentPage === "virtual-keys" || currentPage === "ai-gateway" ? (
               <ErrorBoundary moduleName="Virtual Keys">
                 <VirtualKeyManagement />
@@ -210,8 +221,12 @@ export default function App() {
               <EmailTemplates />
             ) : currentPage === "system-notifications" ? (
               <SystemNotifications />
-            ) : currentPage === "logs" ? (
-              <LogsPage />
+            ) : currentPage === "logs" || currentPage === "audit-logs" || currentPage === "audit-log" ? (
+              <LogsPage defaultTab={currentPage.includes("audit") ? "audit" : "login"} />
+            ) : currentPage === "my-profile" || currentPage === "profile" ? (
+              <ErrorBoundary moduleName="My Profile">
+                <MyProfile onNavigate={handleNavigate} />
+              </ErrorBoundary>
             ) : currentPage === "site-map" ? (
               <SiteMap onNavigate={handleNavigate} currentPage={currentPage} />
             ) : currentPage === "dashboard" ? (

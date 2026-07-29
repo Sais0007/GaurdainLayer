@@ -9,6 +9,7 @@ import {
   UserIcon,
   HelpCircle,
   User,
+  Building2,
 } from "lucide-react";
 import { getNavigationData } from "../../mockAPI/navigationData";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -126,8 +127,10 @@ export function Sidebar({
     "dashboard": t.nav.dashboard,
     "access-control": (t.nav as any).accessControl || "Access Control",
     "teams": (t.nav as any).teams || "Teams",
-    "internal-users": (t.nav as any).internalUsers || "Internal Users",
+    "internal-users": (t.nav as any).internalUsers || "Users",
     "organizations": (t.nav as any).organizations || "Organizations",
+    "credentials-management": "Credentials Management",
+    "model-management": "Model Management",
     "ai-gateway": (t.nav as any).aiGateway || "AI Gateway",
     "virtual-key": (t.nav as any).virtualKey || "Virtual Key",
     "site-map": t.nav.siteMap,
@@ -167,17 +170,17 @@ export function Sidebar({
     >
       {/* Logo at Top - 48px height to match GlobalHeader */}
       <div
-        className={`h-12 flex-shrink-0 px-4 ${isCollapsed ? "flex justify-center items-center" : "flex items-center justify-between"}`}
+        className={`h-12 flex-shrink-0 px-3 ${isCollapsed ? "flex justify-center items-center" : "flex items-center justify-between"}`}
       >
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <img
               src={logoUrl}
               alt="Logo"
-              className="h-8 w-auto object-contain"
+              className="h-7 w-auto flex-shrink-0 object-contain"
             />
-            <span className="text-xl font-bold tracking-tight text-primary-600 dark:text-primary-400">
-              Guardian Layer
+            <span className="text-[14px] font-bold tracking-tight text-primary-600 dark:text-primary-400 whitespace-nowrap">
+              Guardian Layer Org
             </span>
           </div>
         )}
@@ -185,13 +188,13 @@ export function Sidebar({
         {/* Hamburger Toggle Button */}
         <button
           onClick={onToggleCollapse}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
+          className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors ml-1"
           aria-label={
             isCollapsed ? "Expand sidebar" : "Collapse sidebar"
           }
           title={isCollapsed ? "Expand menu" : "Collapse menu"}
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-4 h-4" />
         </button>
       </div>
 
@@ -366,12 +369,22 @@ export function Sidebar({
                 <button
                   onClick={() => {
                     setShowProfileDrawer(false);
-                    // Handle profile click
+                    onNavigate?.("my-profile");
                   }}
                   className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded transition-colors flex items-center gap-2"
                 >
                   <User className="w-4 h-4" />
                   <span>My Profile</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProfileDrawer(false);
+                    onNavigate?.("organizations");
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 rounded transition-colors flex items-center gap-2"
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span>Organization Details</span>
                 </button>
                 <button
                   onClick={() => {
@@ -556,13 +569,22 @@ export function Sidebar({
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">john.doe@company.com</div>
               </div>
               <button 
-                onClick={() => { setHoveredFlyout(null); setShowProfileDrawer(true); }}
+                onClick={() => { setHoveredFlyout(null); onNavigate?.("my-profile"); }}
                 className="w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900"
               >
                 My Profile
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                Settings
+              <button 
+                onClick={() => { setHoveredFlyout(null); onNavigate?.("organizations"); }}
+                className="w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900"
+              >
+                Organization Details
+              </button>
+              <button 
+                onClick={() => { setHoveredFlyout(null); setShowChangePasswordModal(true); }}
+                className="w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900"
+              >
+                Change Password
               </button>
               <button 
                 onClick={() => { setHoveredFlyout(null); if(onLogout) onLogout(); }}

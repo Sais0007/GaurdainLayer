@@ -157,8 +157,8 @@ export function PageHeader({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const { getPageLabel, getDynamicBreadcrumbs } = useNavigationHelper();
 
-  // If pageId is provided, title matches sidebar label exactly, else fallback to initialTitle
-  const title = pageId ? getPageLabel(pageId) : (initialTitle || "");
+  // Prefer explicit initialTitle, or fallback to pageId lookup, or empty string
+  const title = initialTitle || (pageId ? getPageLabel(pageId) : "");
 
   // Update browser tab title dynamically
   useEffect(() => {

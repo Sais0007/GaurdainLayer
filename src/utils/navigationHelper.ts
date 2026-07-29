@@ -38,7 +38,11 @@ export function useNavigationHelper() {
     "teams": (t.nav as any).teams || "Teams",
     "internal-users": (t.nav as any).internalUsers || "Internal Users",
     "organizations": (t.nav as any).organizations || "Organizations",
+    "credentials-management": "Credentials Management",
+    "model-management": "Model Management",
     "ai-gateway": (t.nav as any).aiGateway || "AI Gateway",
+    "my-profile": "My Profile",
+    "profile": "My Profile",
   };
 
   const getPageLabel = (pageId: string, fallback: string = ""): string => {
