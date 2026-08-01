@@ -41,6 +41,7 @@ export function useNavigationHelper() {
     "credentials-management": "Credentials Management",
     "model-management": "Model Management",
     "ai-gateway": (t.nav as any).aiGateway || "AI Gateway",
+    "playground": "Playground",
     "my-profile": "My Profile",
     "profile": "My Profile",
   };

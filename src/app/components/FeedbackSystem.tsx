@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { MessageSquarePlus, List, X, Send, Image as ImageIcon, Check, ChevronRight, MessageSquare, Plus, PenTool } from "lucide-react";
 
 // Mock Data for Past Feedbacks
@@ -7,25 +7,75 @@ const MOCK_FEEDBACKS = [
   { id: "FB-1020", subject: "Button hover color issue", date: "2026-05-12", status: "Resolved" },
 ];
 
+const LOCAL_STORAGE_KEY = "hb_support_widget_pos";
+
 export function FeedbackSystem() {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<"idle" | "annotate" | "form" | "list" | "detail">("idle");
   
   // Annotation State
-  const [markers, setMarkers] = useState<{ x: number, y: number, id: number }[]>([]);
-  const [boxes, setBoxes] = useState<{ x: number, y: number, w: number, h: number }[]>([]);
+  const [markers, setMarkers] = useState<{ x: number; y: number; id: number }[]>([]);
+  const [boxes, setBoxes] = useState<{ x: number; y: number; w: number; h: number }[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [startPos, setStartPos] = useState<{ x: number, y: number } | null>(null);
-  const [currentBox, setCurrentBox] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [currentBox, setCurrentBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   
   // Form State
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("Point 1:\n\nPoint 2:\n");
-
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
 
   const fabRef = useRef<HTMLDivElement>(null);
 
+  // ---------------------------------------------------------------------------
+  // DRAGGABLE FLOATING ACTION BUTTON STATE & LOGIC
+  // ---------------------------------------------------------------------------
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return null;
+  });
+
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; initialX: number; initialY: number } | null>(null);
+  const isMovedRef = useRef(false);
+
+  // Set default smart position on mount if null
+  useEffect(() => {
+    if (!position && typeof window !== "undefined") {
+      const defaultX = Math.max(24, window.innerWidth - 80);
+      const defaultY = Math.max(24, window.innerHeight - 96);
+      setPosition({ x: defaultX, y: defaultY });
+    }
+  }, [position]);
+
+  // Keep widget inside screen boundaries on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) return; // Fixed on mobile
+      setPosition((prev) => {
+        if (!prev) return null;
+        const maxX = Math.max(24, window.innerWidth - 72);
+        const maxY = Math.max(24, window.innerHeight - 72);
+        const clampedX = Math.min(Math.max(16, prev.x), maxX);
+        const clampedY = Math.min(Math.max(16, prev.y), maxY);
+        return { x: clampedX, y: clampedY };
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Close popup menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (fabRef.current && !fabRef.current.contains(e.target as Node)) {
@@ -38,7 +88,118 @@ export function FeedbackSystem() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, mode]);
 
-  // Annotation Handlers
+  // Start Mouse / Touch Dragging
+  const handleStartDrag = (clientX: number, clientY: number) => {
+    if (window.innerWidth < 768) return; // Disable dragging on mobile to protect gestures
+    setIsDragging(true);
+    isMovedRef.current = false;
+
+    const currentX = position?.x ?? Math.max(24, window.innerWidth - 80);
+    const currentY = position?.y ?? Math.max(24, window.innerHeight - 96);
+
+    dragStartRef.current = {
+      mouseX: clientX,
+      mouseY: clientY,
+      initialX: currentX,
+      initialY: currentY
+    };
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only primary mouse button
+    handleStartDrag(e.clientX, e.clientY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      handleStartDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  // Window-level Mouse / Touch Move & Release Listeners
+  useEffect(() => {
+    const handleMove = (clientX: number, clientY: number) => {
+      if (!isDragging || !dragStartRef.current) return;
+
+      const deltaX = clientX - dragStartRef.current.mouseX;
+      const deltaY = clientY - dragStartRef.current.mouseY;
+
+      // Threshold check for drag vs click
+      if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+        isMovedRef.current = true;
+      }
+
+      const rawX = dragStartRef.current.initialX + deltaX;
+      const rawY = dragStartRef.current.initialY + deltaY;
+
+      // Clamp within screen boundaries
+      const clampedX = Math.min(Math.max(16, rawX), window.innerWidth - 72);
+      const clampedY = Math.min(Math.max(16, rawY), window.innerHeight - 72);
+
+      const newPos = { x: clampedX, y: clampedY };
+      setPosition(newPos);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const handleEnd = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        if (position) {
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(position));
+          } catch (e) {}
+        }
+      }
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleEnd);
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+      window.addEventListener("touchend", handleEnd);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleEnd);
+    };
+  }, [isDragging, position]);
+
+  // Click vs Drag Toggle Handler
+  const handleFabClick = () => {
+    if (!isMovedRef.current) {
+      setIsOpen(!isOpen);
+    }
+  };
+
+  // Popup Menu Placement (Expands up/down, left/right depending on widget position)
+  const popupAlignmentStyle = useMemo(() => {
+    if (!position || typeof window === "undefined") {
+      return "bottom-16 right-0";
+    }
+    const isTopHalf = position.y < window.innerHeight / 2;
+    const isLeftHalf = position.x < window.innerWidth / 2;
+
+    const vertClass = isTopHalf ? "top-16" : "bottom-16";
+    const horizClass = isLeftHalf ? "left-0" : "right-0";
+
+    return `${vertClass} ${horizClass}`;
+  }, [position]);
+
+  // ---------------------------------------------------------------------------
+  // ANNOTATION HANDLERS
+  // ---------------------------------------------------------------------------
   const handleOverlayMouseDown = (e: React.MouseEvent) => {
     if (mode !== "annotate") return;
     setStartPos({ x: e.clientX, y: e.clientY });
@@ -61,7 +222,6 @@ export function FeedbackSystem() {
     if (!isDrawing || !startPos) return;
     setIsDrawing(false);
     
-    // If it was just a click (or tiny drag), drop a marker instead
     if (Math.abs(e.clientX - startPos.x) < 10 && Math.abs(e.clientY - startPos.y) < 10) {
       setMarkers(prev => [...prev, { x: e.clientX, y: e.clientY, id: prev.length + 1 }]);
       setCurrentBox(null);
@@ -85,35 +245,63 @@ export function FeedbackSystem() {
 
   return (
     <>
-      {/* Floating Action Button */}
+      {/* Draggable Floating Action Button */}
       {mode === "idle" && (
-        <div className="fixed bottom-20 right-6 z-[9000]" ref={fabRef}>
+        <div
+          ref={fabRef}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+          style={
+            position && typeof window !== "undefined" && window.innerWidth >= 768
+              ? {
+                  position: "fixed",
+                  left: `${position.x}px`,
+                  top: `${position.y}px`,
+                  zIndex: 9000
+                }
+              : undefined
+          }
+          className={`${
+            !position || typeof window === "undefined" || window.innerWidth < 768
+              ? "fixed bottom-6 right-6 z-[9000]"
+              : ""
+          } transition-shadow select-none ${
+            isDragging ? "cursor-grabbing opacity-90 scale-105" : "cursor-grab"
+          }`}
+        >
+          {/* Popup Menu */}
           {isOpen && (
-            <div className="absolute bottom-16 right-0 mb-2 w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl overflow-hidden py-1">
+            <div
+              className={`absolute ${popupAlignmentStyle} mb-2 w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl overflow-hidden py-1 z-50 animate-fadeIn`}
+            >
               <button 
                 onClick={() => { setMode("annotate"); setIsOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
               >
-                <div className="bg-primary-50 dark:bg-primary-950 p-1.5 rounded-md text-primary-600 dark:text-primary-400">
+                <div className="bg-primary-50 dark:bg-primary-950 p-1.5 rounded-xl text-primary-600 dark:text-primary-400">
                   <PenTool className="w-4 h-4" />
                 </div>
-                <span className="font-medium">Create Feedback</span>
+                <span className="font-semibold text-xs">Create Feedback</span>
               </button>
+
               <button 
                 onClick={() => { setMode("list"); setIsOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors border-t border-neutral-100 dark:border-neutral-800"
               >
-                <div className="bg-orange-50 dark:bg-orange-950 p-1.5 rounded-md text-orange-600 dark:text-orange-400">
+                <div className="bg-orange-50 dark:bg-orange-950 p-1.5 rounded-xl text-orange-600 dark:text-orange-400">
                   <List className="w-4 h-4" />
                 </div>
-                <span className="font-medium">List your Last Feedbacks</span>
+                <span className="font-semibold text-xs">List your Last Feedbacks</span>
               </button>
             </div>
           )}
+
+          {/* Main Floating Button */}
           <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none"
-            title="Feedback & Support"
+            onClick={handleFabClick}
+            type="button"
+            className="w-14 h-14 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl transition-transform active:scale-95 focus:outline-none cursor-pointer"
+            title="Feedback & Support (Drag to reposition)"
           >
             {isOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
           </button>
@@ -217,13 +405,9 @@ export function FeedbackSystem() {
                 <div className="flex-1 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-900 relative overflow-hidden shadow-inner flex items-center justify-center">
                   <ImageIcon className="w-16 h-16 text-neutral-300 dark:text-neutral-700 absolute" />
                   
-                  {/* Mock rendering of markers relative to the box */}
                   <div className="absolute inset-0 pointer-events-none opacity-50 bg-white dark:bg-neutral-900" />
                   
-                  {/* Render relative boxes and markers for preview */}
                   {(mode === "form" ? boxes : selectedFeedback?.boxes || []).map((box: any, i: number) => {
-                    // Scaled down logic: assuming standard screen 1920x1080 to container
-                    // For simplicity, we'll just render them absolute and scale the container down via CSS transform
                     return (
                       <div 
                         key={i} 
@@ -301,7 +485,6 @@ export function FeedbackSystem() {
                     </button>
                     <button 
                       onClick={() => {
-                        // Submit logic mock
                         resetAnnotation();
                       }}
                       className="px-6 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center gap-2"

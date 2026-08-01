@@ -84,6 +84,18 @@ export const getNavigationData = (
           onClick: () => onNavigate("model-management"),
           active: currentPage === "model-management",
         },
+        {
+          id: "logs",
+          label: "Logs",
+          onClick: () => onNavigate("logs"),
+          active: currentPage === "logs" || currentPage === "request-logs",
+        },
+        {
+          id: "playground",
+          label: "Playground",
+          onClick: () => onNavigate("playground"),
+          active: currentPage === "playground",
+        },
       ],
     },
     {

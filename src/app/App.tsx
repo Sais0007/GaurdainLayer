@@ -15,6 +15,7 @@ import SystemNotifications from "./components/SystemNotifications";
 import RoleManagement from "./components/RoleManagement";
 import LogsManagement from "./components/LogsManagement";
 import LogsPage from "./components/LogsPage";
+import RequestLogsManagement from "./components/RequestLogsManagement";
 import { SiteMap } from "./components/SiteMap";
 import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
@@ -24,6 +25,7 @@ import CredentialsManagement from "./components/CredentialsManagement";
 import ModelManagement from "./components/ModelManagement";
 import { ErrorBoundary } from "./components/hb/common/ErrorBoundary";
 import TeamsManagement from "./components/TeamsManagement";
+import PlaygroundManagement from "./components/PlaygroundManagement";
 import MyProfile from "./components/MyProfile";
 import { FeedbackSystem } from "./components/FeedbackSystem";
 import { GlobalFooter } from "./components/GlobalFooter";
@@ -162,7 +164,7 @@ export default function App() {
                 : isSidebarCollapsed
                   ? "ml-16"
                   : "ml-64"
-            } pb-14`}
+            } ${currentPage === "playground" ? "h-screen flex flex-col overflow-hidden p-0 pb-0" : "pb-14"}`}
           >
             {/* Global Header */}
             <GlobalHeader
@@ -221,8 +223,14 @@ export default function App() {
               <EmailTemplates />
             ) : currentPage === "system-notifications" ? (
               <SystemNotifications />
-            ) : currentPage === "logs" || currentPage === "audit-logs" || currentPage === "audit-log" ? (
-              <LogsPage defaultTab={currentPage.includes("audit") ? "audit" : "login"} />
+            ) : currentPage === "logs" || currentPage === "request-logs" || currentPage === "request-log" || currentPage === "audit-logs" || currentPage === "audit-log" ? (
+              <ErrorBoundary moduleName="Request Logs">
+                <RequestLogsManagement />
+              </ErrorBoundary>
+            ) : currentPage === "playground" ? (
+              <ErrorBoundary moduleName="Playground">
+                <PlaygroundManagement />
+              </ErrorBoundary>
             ) : currentPage === "my-profile" || currentPage === "profile" ? (
               <ErrorBoundary moduleName="My Profile">
                 <MyProfile onNavigate={handleNavigate} />
@@ -239,10 +247,12 @@ export default function App() {
             )}
 
             {/* Global Footer */}
-            <GlobalFooter 
-              isSidebarCollapsed={isSidebarCollapsed} 
-              menuOrientation={menuOrientation} 
-            />
+            {currentPage !== "playground" && (
+              <GlobalFooter 
+                isSidebarCollapsed={isSidebarCollapsed} 
+                menuOrientation={menuOrientation} 
+              />
+            )}
           </main>
 
           {/* Global Feedback System */}

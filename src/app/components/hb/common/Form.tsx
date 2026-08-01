@@ -332,11 +332,15 @@ interface FormSectionProps {
 }
 
 export function FormSection({ children, className, title }: FormSectionProps) {
+  const cleanedTitle = title
+    ? title.replace(/^(Section\s+\d+|General\s+Section|Information\s+Section|Configuration\s+Section)[\s\-_—:]+/i, '')
+    : title;
+
   return (
     <div className={cn("space-y-4", className)}>
-      {title && (
+      {cleanedTitle && (
         <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-3">
-          {title}
+          {cleanedTitle}
         </h4>
       )}
       {children}

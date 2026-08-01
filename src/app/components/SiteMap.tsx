@@ -20,6 +20,9 @@ export function SiteMap({ onNavigate, currentPage }: SiteMapProps) {
     "model-management": "Model Management",
     "ai-gateway": (t.nav as any).aiGateway || "AI Gateway",
     "virtual-key": (t.nav as any).virtualKey || "Virtual Key",
+    "logs": "Logs",
+    "request-logs": "Request Logs",
+    "playground": "Playground",
     "site-map": t.nav.siteMap,
     "hb-templates": t.nav.hbTemplates,
     "ui-kit": t.nav.uiKit,
@@ -43,7 +46,6 @@ export function SiteMap({ onNavigate, currentPage }: SiteMapProps) {
     "audit-logs": t.nav.auditLogs,
     "api-logs": t.nav.apiLogs,
     "email-logs": t.nav.emailLogs,
-    "logs": t.nav.logs,
   };
 
   const getLabel = (id: string, fallback: string) => navLabelMap[id] ?? fallback;

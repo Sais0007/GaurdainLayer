@@ -65,6 +65,30 @@ export interface CredentialItem {
   linkedModelsCount?: number;
 }
 
+// Helper mapping to display User Names instead of raw email addresses
+const EMAIL_TO_NAME_MAP: Record<string, string> = {
+  "hbadmin@yopmail.com": "John Doe",
+  "sarah.connor@hb.com": "Sarah Connor",
+  "alex.dev@hb.com": "Alex Dev",
+  "michael.scott@hb.com": "Michael Scott",
+  "superadmin@spinecloudiq.com": "Super Admin",
+  "john.doe@example.com": "John Doe",
+  "john.doe@company.com": "John Doe",
+};
+
+export const formatUserNameDisplay = (value: string | undefined | null): string => {
+  if (!value) return "—";
+  if (EMAIL_TO_NAME_MAP[value]) return EMAIL_TO_NAME_MAP[value];
+  if (value.includes("@")) {
+    const namePart = value.split("@")[0];
+    return namePart
+      .split(".")
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(" ");
+  }
+  return value;
+};
+
 // Global initial credentials storage for cross-module sharing
 export const initialMockCredentials: CredentialItem[] = [
   {
@@ -72,9 +96,9 @@ export const initialMockCredentials: CredentialItem[] = [
     name: "OpenAI Production Key",
     provider: "OpenAI",
     createdOn: "2026-07-10",
-    createdBy: "superadmin@spinecloudiq.com",
+    createdBy: "Super Admin",
     updatedOn: "2026-07-20",
-    updatedBy: "superadmin@spinecloudiq.com",
+    updatedBy: "Super Admin",
     status: "Active",
     apiBaseUrl: "https://api.openai.com/v1",
     apiKey: "sk-proj-99281734910287a1",
@@ -85,9 +109,9 @@ export const initialMockCredentials: CredentialItem[] = [
     name: "Claude Enterprise Key",
     provider: "Anthropic",
     createdOn: "2026-07-12",
-    createdBy: "sarah.connor@hb.com",
+    createdBy: "Sarah Connor",
     updatedOn: "2026-07-22",
-    updatedBy: "sarah.connor@hb.com",
+    updatedBy: "Sarah Connor",
     status: "Active",
     apiBaseUrl: "https://api.anthropic.com/v1",
     apiKey: "sk-ant-api03-77192038144bc",
@@ -98,9 +122,9 @@ export const initialMockCredentials: CredentialItem[] = [
     name: "Azure AI Endpoint Key",
     provider: "Azure AI",
     createdOn: "2026-07-15",
-    createdBy: "hbadmin@yopmail.com",
+    createdBy: "John Doe",
     updatedOn: "2026-07-15",
-    updatedBy: "hbadmin@yopmail.com",
+    updatedBy: "John Doe",
     status: "Active",
     apiBaseUrl: "https://hb-azure-ai.openai.azure.com",
     apiKey: "az-key-88129301990f",
@@ -111,9 +135,9 @@ export const initialMockCredentials: CredentialItem[] = [
     name: "DeepSeek R1 Key",
     provider: "DeepSeek",
     createdOn: "2026-07-18",
-    createdBy: "alex.dev@hb.com",
+    createdBy: "Alex Dev",
     updatedOn: "2026-07-18",
-    updatedBy: "alex.dev@hb.com",
+    updatedBy: "Alex Dev",
     status: "Active",
     apiBaseUrl: "https://api.deepseek.com/v1",
     apiKey: "sk-ds-33129481001e",
@@ -124,9 +148,9 @@ export const initialMockCredentials: CredentialItem[] = [
     name: "Local Ollama Cluster",
     provider: "Ollama",
     createdOn: "2026-07-20",
-    createdBy: "michael.scott@hb.com",
+    createdBy: "Michael Scott",
     updatedOn: "2026-07-20",
-    updatedBy: "michael.scott@hb.com",
+    updatedBy: "Michael Scott",
     status: "Inactive",
     apiBaseUrl: "http://localhost:11434",
     apiKey: "ollama-local-key",
@@ -692,11 +716,8 @@ export default function CredentialsManagement() {
 
                     {/* Provider Name */}
                     {visibleColumns.provider && (
-                      <td className="p-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 shadow-xs">
-                          <Globe className="w-3.5 h-3.5 text-neutral-500" />
-                          {item.provider}
-                        </span>
+                      <td className="p-4 text-neutral-600 dark:text-neutral-400 text-xs font-medium">
+                        {item.provider}
                       </td>
                     )}
 
@@ -710,7 +731,7 @@ export default function CredentialsManagement() {
                     {/* Created By */}
                     {visibleColumns.createdBy && (
                       <td className="p-4 text-neutral-600 dark:text-neutral-400 text-xs truncate max-w-[160px]">
-                        {item.createdBy}
+                        {formatUserNameDisplay(item.createdBy)}
                       </td>
                     )}
 
@@ -724,7 +745,7 @@ export default function CredentialsManagement() {
                     {/* Updated By */}
                     {visibleColumns.updatedBy && (
                       <td className="p-4 text-neutral-600 dark:text-neutral-400 text-xs truncate max-w-[160px]">
-                        {item.updatedBy}
+                        {formatUserNameDisplay(item.updatedBy)}
                       </td>
                     )}
 
@@ -804,10 +825,10 @@ export default function CredentialsManagement() {
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              pageSize={pageSize}
               totalItems={totalItems}
+              itemsPerPage={pageSize}
               onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => {
+              onItemsPerPageChange={(size) => {
                 setPageSize(size);
                 setCurrentPage(1);
               }}
@@ -942,7 +963,7 @@ export default function CredentialsManagement() {
         maxWidth="max-w-2xl"
       >
         <form onSubmit={handleSaveCredential} className="space-y-5">
-          <FormSection title="Section 1 — Basic Information">
+          <FormSection title="Basic Information">
             <FormGrid cols={2}>
               <FormField>
                 <FormLabel htmlFor="credential-name-input" required>
@@ -983,7 +1004,7 @@ export default function CredentialsManagement() {
             </FormGrid>
           </FormSection>
 
-          <FormSection title="Section 2 — Connection Details">
+          <FormSection title="Connection Details">
             <FormField>
               <FormLabel htmlFor="api-base-url-input" required>
                 API Base URL
