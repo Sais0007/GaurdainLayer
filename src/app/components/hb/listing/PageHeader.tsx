@@ -165,7 +165,7 @@ export function PageHeader({
     if (pageId) {
       const pageLabel = getPageLabel(pageId);
       if (pageLabel) {
-        document.title = `${pageLabel} | HB Template`;
+        document.title = `${pageLabel} | Organization Admin - GL`;
       }
     }
   }, [pageId, getPageLabel]);

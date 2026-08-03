@@ -62,7 +62,7 @@ import {
   DeletedTeamItem
 } from "../../mockAPI/requestLogsData";
 
-export type RequestLogsTab = "request" | "audit" | "deleted-keys" | "deleted-teams";
+export type RequestLogsTab = "request" | "audit";
 
 const TIME_RANGES = [
   "Last Minute",
@@ -79,6 +79,57 @@ const MODEL_OPTIONS_BY_PROVIDER = [
   { provider: "Google", models: ["gemini-2.5-flash", "gemini-1.5-pro", "gemini/gemini-2.5-flash"] },
   { provider: "Meta", models: ["llama-3-70b", "llama-3-8b"] }
 ];
+
+function JSONCodeBlock({
+  data,
+  label,
+  emptyText = "N/A"
+}: {
+  data: Record<string, any> | null;
+  label: string;
+  emptyText?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!data) return;
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    toast.success(`${label} JSON copied to clipboard!`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden flex flex-col h-full shadow-2xs">
+      <div className="px-4 py-2.5 bg-neutral-50/80 dark:bg-neutral-950/80 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">{label}</span>
+        {data && (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="p-1 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+            title={`Copy ${label} JSON`}
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        )}
+      </div>
+
+      <div className="p-4 overflow-x-auto flex-1 font-mono text-[11px] leading-relaxed min-h-[140px]">
+        {data ? (
+          <pre className="text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap break-words">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-500 text-xs gap-1 py-8">
+            <span className="font-medium">{emptyText}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function RequestLogsManagement() {
   // Main Tab State
@@ -134,6 +185,25 @@ export default function RequestLogsManagement() {
   const [openMetadata, setOpenMetadata] = useState(true);
   const [openError, setOpenError] = useState(true);
   const [openTimeline, setOpenTimeline] = useState(true);
+
+  // --- Audit Logs State & Handlers ---
+  const [auditSearchQuery, setAuditSearchQuery] = useState("");
+  const [auditTimeRange, setAuditTimeRange] = useState("Last 7 Days");
+  const [showAuditTimeDropdown, setShowAuditTimeDropdown] = useState(false);
+  const [showAuditFilterDrawer, setShowAuditFilterDrawer] = useState(false);
+
+  const [auditFilterActions, setAuditFilterActions] = useState<string[]>([]);
+  const [auditFilterTables, setAuditFilterTables] = useState<string[]>([]);
+  const [auditFilterChangedBy, setAuditFilterChangedBy] = useState("");
+  const [auditFilterKeyHash, setAuditFilterKeyHash] = useState("");
+  const [auditFilterObjectId, setAuditFilterObjectId] = useState("");
+
+  const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLogItem | null>(null);
+  const [auditSortField, setAuditSortField] = useState<keyof AuditLogItem>("timestamp");
+  const [auditSortDirection, setAuditSortDirection] = useState<"asc" | "desc">("desc");
+
+  const [auditCurrentPage, setAuditCurrentPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(50);
 
   // Live Tail Auto-refresh simulation
   useEffect(() => {
@@ -305,6 +375,92 @@ export default function RequestLogsManagement() {
     );
   };
 
+  // --- Audit Logs Logic & Handlers ---
+  const auditActiveFilterCount = useMemo(() => {
+    let count = 0;
+    if (auditFilterActions.length > 0) count++;
+    if (auditFilterTables.length > 0) count++;
+    if (auditFilterChangedBy) count++;
+    if (auditFilterKeyHash) count++;
+    if (auditFilterObjectId) count++;
+    return count;
+  }, [auditFilterActions, auditFilterTables, auditFilterChangedBy, auditFilterKeyHash, auditFilterObjectId]);
+
+  const handleResetAuditFilters = () => {
+    setAuditSearchQuery("");
+    setAuditTimeRange("Last 7 Days");
+    setAuditFilterActions([]);
+    setAuditFilterTables([]);
+    setAuditFilterChangedBy("");
+    setAuditFilterKeyHash("");
+    setAuditFilterObjectId("");
+    toast.info("Audit log filters reset.");
+  };
+
+  const filteredAuditLogs = useMemo(() => {
+    return mockAuditLogs.filter((log) => {
+      const q = auditSearchQuery.toLowerCase().trim();
+      if (q) {
+        const matchesQuery =
+          log.objectId.toLowerCase().includes(q) ||
+          (log.apiKeyHash && log.apiKeyHash.toLowerCase().includes(q)) ||
+          log.changedBy.toLowerCase().includes(q) ||
+          log.table.toLowerCase().includes(q) ||
+          log.action.toLowerCase().includes(q);
+        if (!matchesQuery) return false;
+      }
+
+      if (auditFilterActions.length > 0 && !auditFilterActions.includes(log.action)) return false;
+      if (auditFilterTables.length > 0 && !auditFilterTables.includes(log.table)) return false;
+      if (auditFilterChangedBy && !log.changedBy.toLowerCase().includes(auditFilterChangedBy.toLowerCase())) return false;
+      if (auditFilterKeyHash && (!log.apiKeyHash || !log.apiKeyHash.toLowerCase().includes(auditFilterKeyHash.toLowerCase()))) return false;
+      if (auditFilterObjectId && !log.objectId.toLowerCase().includes(auditFilterObjectId.toLowerCase())) return false;
+
+      return true;
+    });
+  }, [auditSearchQuery, auditFilterActions, auditFilterTables, auditFilterChangedBy, auditFilterKeyHash, auditFilterObjectId]);
+
+  const sortedAuditLogs = useMemo(() => {
+    return [...filteredAuditLogs].sort((a, b) => {
+      let aVal: any = a[auditSortField];
+      let bVal: any = b[auditSortField];
+      if (typeof aVal === "string") {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal || "").toLowerCase();
+      }
+      if (aVal < bVal) return auditSortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return auditSortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredAuditLogs, auditSortField, auditSortDirection]);
+
+  const totalAuditItems = sortedAuditLogs.length;
+  const totalAuditPages = Math.ceil(totalAuditItems / auditPageSize) || 1;
+  const paginatedAuditLogs = useMemo(() => {
+    const start = (auditCurrentPage - 1) * auditPageSize;
+    return sortedAuditLogs.slice(start, start + auditPageSize);
+  }, [sortedAuditLogs, auditCurrentPage, auditPageSize]);
+
+  const handleAuditSort = (field: keyof AuditLogItem) => {
+    if (auditSortField === field) {
+      setAuditSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setAuditSortField(field);
+      setAuditSortDirection("asc");
+    }
+  };
+
+  const renderAuditSortIndicator = (field: keyof AuditLogItem) => {
+    if (auditSortField !== field) {
+      return <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />;
+    }
+    return auditSortDirection === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-primary-600 dark:text-primary-400 font-bold" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-primary-600 dark:text-primary-400 font-bold" />
+    );
+  };
+
   // Copy Text Helper
   const handleCopyText = (text: string, label: string = "Copied to clipboard!") => {
     navigator.clipboard.writeText(text);
@@ -336,8 +492,12 @@ export default function RequestLogsManagement() {
     <div className="p-6 max-w-[1700px] mx-auto space-y-5">
       {/* -------------------- 1. PAGE HEADER & BREADCRUMB -------------------- */}
       <PageHeader
-        title="Request Logs"
-        subtitle="Real-time observability, gateway tracing, cost analytics, and failure diagnostics across AI models."
+        title={activeTab === "audit" ? "Audit Logs" : "Request Logs"}
+        subtitle={
+          activeTab === "audit"
+            ? "Track every Create, Update and Delete action performed across Organizations, Teams, Users, Models, Keys and Platform configuration."
+            : "Real-time observability, gateway tracing, cost analytics, and failure diagnostics across AI models."
+        }
         breadcrumbs={[
           { label: "AI Gateway", href: "#" },
           { label: "Logs", current: true }
@@ -370,32 +530,6 @@ export default function RequestLogsManagement() {
         >
           <FileText className="w-4 h-4" />
           <span>Audit Logs</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("deleted-keys")}
-          className={`pb-3 font-semibold transition-all relative flex items-center gap-2 ${
-            activeTab === "deleted-keys"
-              ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 font-bold"
-              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-          }`}
-        >
-          <Hash className="w-4 h-4" />
-          <span>Deleted Keys</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("deleted-teams")}
-          className={`pb-3 font-semibold transition-all relative flex items-center gap-2 ${
-            activeTab === "deleted-teams"
-              ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 font-bold"
-              : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Deleted Teams</span>
         </button>
       </div>
 
@@ -753,34 +887,361 @@ export default function RequestLogsManagement() {
       {/* ========================================================================= */}
       {/* TAB 2, 3, 4: OTHER OBSERVABILITY TABS                                    */}
       {/* ========================================================================= */}
+      {/* TAB 2: AUDIT LOGS                                                         */}
+      {/* ========================================================================= */}
       {activeTab === "audit" && (
-        <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 shadow-xs animate-fadeIn space-y-4">
-          <div className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary-600" />
-            <span>AI Gateway Audit Logs</span>
+        <div className="space-y-4 animate-fadeIn">
+          {/* -------------------- FILTER TOOLBAR -------------------- */}
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3.5 shadow-2xs space-y-3">
+            {/* Top Action Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAuditFilterDrawer(true)}
+                  className="px-3.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold flex items-center gap-2 transition-colors relative"
+                >
+                  <Filter className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+                  <span>Filters</span>
+                  {auditActiveFilterCount > 0 && (
+                    <span className="w-4 h-4 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">
+                      {auditActiveFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetAuditFilters}
+                  className="px-3.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <span>Reset Filters</span>
+                </button>
+              </div>
+
+              {/* Summary Counter & Pagination Controls */}
+              <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+                <span>
+                  Showing <strong className="text-neutral-900 dark:text-white font-bold">{paginatedAuditLogs.length > 0 ? (auditCurrentPage - 1) * auditPageSize + 1 : 0} - {Math.min(auditCurrentPage * auditPageSize, totalAuditItems)}</strong> of <strong className="text-neutral-900 dark:text-white font-bold">{totalAuditItems}</strong> results
+                </span>
+
+                <div className="flex items-center gap-1.5 pl-2 border-l border-neutral-200 dark:border-neutral-800">
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                    Page {auditCurrentPage} of {totalAuditPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={auditCurrentPage === 1}
+                    onClick={() => setAuditCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-2 py-1 rounded-md border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-medium transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={auditCurrentPage === totalAuditPages}
+                    onClick={() => setAuditCurrentPage((p) => Math.min(totalAuditPages, p + 1))}
+                    className="px-2 py-1 rounded-md border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-medium transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Row: Search + Time Range + Refresh */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+              <div className="relative flex-1 min-w-[280px]">
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={auditSearchQuery}
+                  onChange={(e) => setAuditSearchQuery(e.target.value)}
+                  placeholder="Search by Request ID, Session ID, Key Hash, User, Table, Action..."
+                  className="w-full h-9 pl-9 pr-8 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-medium text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-primary-500 transition-colors"
+                />
+                {auditSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setAuditSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {/* Time Range Selector */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowAuditTimeDropdown(!showAuditTimeDropdown)}
+                    className="h-9 px-3 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 text-xs font-semibold flex items-center gap-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>{auditTimeRange}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+                  </button>
+
+                  {showAuditTimeDropdown && (
+                    <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl py-1 z-30 animate-fadeIn">
+                      {TIME_RANGES.map((tr) => (
+                        <button
+                          key={tr}
+                          type="button"
+                          onClick={() => {
+                            setAuditTimeRange(tr);
+                            setShowAuditTimeDropdown(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                            auditTimeRange === tr
+                              ? "bg-primary-50 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 font-bold"
+                              : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                          }`}
+                        >
+                          {tr}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fetch Button */}
+                <button
+                  type="button"
+                  onClick={handleFetch}
+                  disabled={isFetching}
+                  className="h-9 px-3.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-primary-600" : "text-neutral-500"}`} />
+                  <span>Fetch</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 font-semibold py-2">
-                <th className="py-2.5">User</th>
-                <th className="py-2.5">Action</th>
-                <th className="py-2.5">Resource</th>
-                <th className="py-2.5">Timestamp</th>
-                <th className="py-2.5">IP Address</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {mockAuditLogs.map((item) => (
-                <tr key={item.id} className="py-2.5">
-                  <td className="py-2.5 font-semibold text-neutral-900 dark:text-white">{item.user}</td>
-                  <td className="py-2.5 text-primary-600 dark:text-primary-400 font-medium">{item.action}</td>
-                  <td className="py-2.5 text-neutral-700 dark:text-neutral-300 font-mono">{item.resource}</td>
-                  <td className="py-2.5 text-neutral-500">{item.timestamp}</td>
-                  <td className="py-2.5 font-mono text-neutral-500">{item.ipAddress}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          {/* -------------------- AUDIT LOGS TABLE -------------------- */}
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-neutral-50/80 dark:bg-neutral-950/60 border-b border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 font-semibold select-none">
+                    <th
+                      onClick={() => handleAuditSort("timestamp")}
+                      className="py-3 px-4 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Timestamp</span>
+                        {renderAuditSortIndicator("timestamp")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleAuditSort("action")}
+                      className="py-3 px-3.5 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Action</span>
+                        {renderAuditSortIndicator("action")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleAuditSort("table")}
+                      className="py-3 px-3.5 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Table</span>
+                        {renderAuditSortIndicator("table")}
+                      </div>
+                    </th>
+                    <th className="py-3 px-3.5">Object ID</th>
+                    <th
+                      onClick={() => handleAuditSort("changedBy")}
+                      className="py-3 px-3.5 cursor-pointer hover:text-neutral-900 dark:hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Changed By</span>
+                        {renderAuditSortIndicator("changedBy")}
+                      </div>
+                    </th>
+                    <th className="py-3 px-3.5">API Key (Hash)</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 font-medium">
+                  {paginatedAuditLogs.length > 0 ? (
+                    paginatedAuditLogs.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => setSelectedAuditLog(item)}
+                        className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/50 cursor-pointer transition-colors group"
+                      >
+                        {/* Timestamp */}
+                        <td className="py-3 px-4 font-mono text-[11px] text-neutral-600 dark:text-neutral-300 whitespace-nowrap">
+                          {item.timestamp}
+                        </td>
+
+                        {/* Action Badge */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          {item.action === "Created" && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                              Created
+                            </span>
+                          )}
+                          {item.action === "Updated" && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800">
+                              Updated
+                            </span>
+                          )}
+                          {item.action === "Deleted" && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800">
+                              Deleted
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Table */}
+                        <td className="py-3 px-3.5 text-neutral-900 dark:text-white font-medium whitespace-nowrap">
+                          {item.table}
+                        </td>
+
+                        {/* Object ID */}
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-neutral-800 dark:text-neutral-200 max-w-[200px]">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="truncate">{item.objectId}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyText(item.objectId, "Object ID copied!");
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 text-neutral-400 hover:text-primary-600 transition-opacity"
+                              title="Copy Object ID"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Changed By */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                            {item.changedBy}
+                          </span>
+                        </td>
+
+                        {/* API Key Hash */}
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-neutral-500 max-w-[180px]">
+                          {item.apiKeyHash && item.apiKeyHash !== "-" ? (
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="truncate">{item.apiKeyHash}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyText(item.apiKeyHash!, "API Key Hash copied!");
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-opacity"
+                                title="Copy API Key Hash"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-neutral-400 font-mono">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-neutral-500 dark:text-neutral-400">
+                        <div className="max-w-xs mx-auto space-y-2">
+                          <FileText className="w-8 h-8 text-neutral-400 mx-auto" />
+                          <div className="font-semibold text-neutral-900 dark:text-white">No Audit Logs Found</div>
+                          <p className="text-xs text-neutral-500">No audit activities match your selected search or filters.</p>
+                          <button
+                            type="button"
+                            onClick={handleResetAuditFilters}
+                            className="mt-2 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-semibold hover:bg-primary-700 transition-colors"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/40 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
+              <div className="flex items-center gap-2">
+                <span>Rows per page:</span>
+                <select
+                  value={auditPageSize}
+                  onChange={(e) => {
+                    setAuditPageSize(Number(e.target.value));
+                    setAuditCurrentPage(1);
+                  }}
+                  className="h-8 px-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-md font-semibold text-neutral-800 dark:text-white focus:outline-none"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span>
+                  Showing {paginatedAuditLogs.length > 0 ? (auditCurrentPage - 1) * auditPageSize + 1 : 0} - {Math.min(auditCurrentPage * auditPageSize, totalAuditItems)} of {totalAuditItems}
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={auditCurrentPage === 1}
+                    onClick={() => setAuditCurrentPage(1)}
+                    className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    title="First Page"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={auditCurrentPage === 1}
+                    onClick={() => setAuditCurrentPage((p) => Math.max(1, p - 1))}
+                    className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="px-2 font-semibold text-neutral-800 dark:text-white">
+                    {auditCurrentPage} / {totalAuditPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={auditCurrentPage === totalAuditPages}
+                    onClick={() => setAuditCurrentPage((p) => Math.min(totalAuditPages, p + 1))}
+                    className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    title="Next Page"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={auditCurrentPage === totalAuditPages}
+                    onClick={() => setAuditCurrentPage(totalAuditPages)}
+                    className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    title="Last Page"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1585,6 +2046,278 @@ export default function RequestLogsManagement() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* AUDIT LOGS FILTER DRAWER (RIGHT SLIDE-OVER)                               */}
+      {/* ========================================================================= */}
+      {showAuditFilterDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 w-full max-w-lg h-full flex flex-col shadow-2xl animate-slideLeft">
+            {/* Drawer Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                <h3 className="font-bold text-sm text-neutral-900 dark:text-white">
+                  Filter Audit Logs
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAuditFilterDrawer(false)}
+                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-5 text-xs custom-scrollbar">
+              {/* Date Range */}
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Date Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Today", "Yesterday", "Last 7 Days", "Last 30 Days"].map((dr) => (
+                    <button
+                      key={dr}
+                      type="button"
+                      onClick={() => setAuditTimeRange(dr)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors text-left ${
+                        auditTimeRange === dr
+                          ? "bg-primary-50 dark:bg-primary-950/60 border-primary-500 text-primary-600 dark:text-primary-400"
+                          : "bg-white dark:bg-neutral-950 border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50"
+                      }`}
+                    >
+                      {dr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Multi-select */}
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Action</label>
+                <div className="flex flex-wrap gap-2">
+                  {["Created", "Updated", "Deleted"].map((act) => {
+                    const isChecked = auditFilterActions.includes(act);
+                    return (
+                      <button
+                        key={act}
+                        type="button"
+                        onClick={() => {
+                          if (isChecked) {
+                            setAuditFilterActions(auditFilterActions.filter((a) => a !== act));
+                          } else {
+                            setAuditFilterActions([...auditFilterActions, act]);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                          isChecked
+                            ? "bg-primary-600 border-primary-600 text-white"
+                            : "bg-white dark:bg-neutral-950 border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50"
+                        }`}
+                      >
+                        {act}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Table Multi-select */}
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Table / Resource</label>
+                <div className="flex flex-wrap gap-2">
+                  {["Users", "Teams", "Organizations", "Models", "Keys", "Policies", "UI Settings"].map((tbl) => {
+                    const isChecked = auditFilterTables.includes(tbl);
+                    return (
+                      <button
+                        key={tbl}
+                        type="button"
+                        onClick={() => {
+                          if (isChecked) {
+                            setAuditFilterTables(auditFilterTables.filter((t) => t !== tbl));
+                          } else {
+                            setAuditFilterTables([...auditFilterTables, tbl]);
+                          }
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                          isChecked
+                            ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 border-neutral-800 font-semibold"
+                            : "bg-white dark:bg-neutral-950 border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50"
+                        }`}
+                      >
+                        {tbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Changed By */}
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Changed By</label>
+                <input
+                  type="text"
+                  value={auditFilterChangedBy}
+                  onChange={(e) => setAuditFilterChangedBy(e.target.value)}
+                  placeholder="Filter by user or admin e.g. Default Proxy Admin"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-neutral-900 dark:text-white"
+                />
+              </div>
+
+              {/* API Key Hash */}
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">API Key Hash</label>
+                <input
+                  type="text"
+                  value={auditFilterKeyHash}
+                  onChange={(e) => setAuditFilterKeyHash(e.target.value)}
+                  placeholder="Filter by API Key Hash e.g. b9042ff8a38e..."
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-neutral-900 dark:text-white"
+                />
+              </div>
+
+              {/* Object ID */}
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Object ID</label>
+                <input
+                  type="text"
+                  value={auditFilterObjectId}
+                  onChange={(e) => setAuditFilterObjectId(e.target.value)}
+                  placeholder="Filter by Object ID e.g. default_user_id"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-neutral-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="p-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-end gap-3 bg-neutral-50 dark:bg-neutral-900/60">
+              <button
+                type="button"
+                onClick={handleResetAuditFilters}
+                className="px-4 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 text-xs font-semibold transition-colors"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAuditFilterDrawer(false);
+                  toast.success("Applied audit log filters.");
+                }}
+                className="px-4 py-2 rounded-lg bg-primary-600 text-white text-xs font-semibold hover:bg-primary-700 transition-colors"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* AUDIT LOG DETAILS DRAWER (RIGHT SLIDE-OVER)                               */}
+      {/* ========================================================================= */}
+      {selectedAuditLog && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 w-full max-w-2xl sm:max-w-3xl h-full flex flex-col shadow-2xl animate-slideLeft">
+            {/* Drawer Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <div className="flex items-center gap-3">
+                {selectedAuditLog.action === "Created" && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                    Created
+                  </span>
+                )}
+                {selectedAuditLog.action === "Updated" && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800">
+                    Updated
+                  </span>
+                )}
+                {selectedAuditLog.action === "Deleted" && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800">
+                    Deleted
+                  </span>
+                )}
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 font-mono">
+                  {selectedAuditLog.timestamp}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAuditLog(null)}
+                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+              {/* DETAILS Card */}
+              <div className="bg-neutral-50/70 dark:bg-neutral-900/60 p-5 rounded-2xl border border-neutral-200 dark:border-neutral-800 space-y-3">
+                <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">DETAILS</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-6 text-xs">
+                  <div>
+                    <span className="block text-neutral-400 font-medium mb-0.5">Table</span>
+                    <span className="font-semibold text-neutral-900 dark:text-white">{selectedAuditLog.table}</span>
+                  </div>
+                  <div>
+                    <span className="block text-neutral-400 font-medium mb-0.5">Object ID</span>
+                    <div className="flex items-center gap-1.5 font-mono text-primary-600 dark:text-primary-400 font-semibold">
+                      <span className="truncate">{selectedAuditLog.objectId}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(selectedAuditLog.objectId, "Object ID copied!")}
+                        className="p-0.5 text-neutral-400 hover:text-primary-600 transition-colors"
+                        title="Copy Object ID"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-neutral-400 font-medium mb-0.5">Changed By</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                      {selectedAuditLog.changedBy}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-neutral-400 font-medium mb-0.5">API Key (Hash)</span>
+                    {selectedAuditLog.apiKeyHash && selectedAuditLog.apiKeyHash !== "-" ? (
+                      <div className="flex items-center gap-1.5 font-mono text-neutral-700 dark:text-neutral-300">
+                        <span className="truncate">{selectedAuditLog.apiKeyHash}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(selectedAuditLog.apiKeyHash!, "API Key Hash copied!")}
+                          className="p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                          title="Copy API Key Hash"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-neutral-400 font-mono">-</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Before / After JSON Comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <JSONCodeBlock
+                  data={selectedAuditLog.action === "Created" ? null : selectedAuditLog.beforeState || null}
+                  label="Before"
+                  emptyText={selectedAuditLog.action === "Created" ? "This record was newly created." : "N/A"}
+                />
+                <JSONCodeBlock
+                  data={selectedAuditLog.action === "Deleted" ? null : selectedAuditLog.afterState || null}
+                  label="After"
+                  emptyText={selectedAuditLog.action === "Deleted" ? "Record no longer exists." : "N/A"}
+                />
               </div>
             </div>
           </div>

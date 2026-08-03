@@ -260,12 +260,19 @@ export default function ModelManagement() {
   const [formProvider, setFormProvider] = useState<ModelItem["provider"]>("OpenAI");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>(["GPT-4o-2026-08"]);
   const [formModelAlias, setFormModelAlias] = useState("");
+  const [formModelAliases, setFormModelAliases] = useState<Record<string, string>>({ "GPT-4o-2026-08": "GPT-4o 2026-08" });
   const [formCredentialSource, setFormCredentialSource] = useState<"existing" | "new">("existing");
   const [formCredentialId, setFormCredentialId] = useState("");
   const [formApiBaseUrl, setFormApiBaseUrl] = useState("https://api.openai.com/v1");
   const [formApiKey, setFormApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingModel, setIsSavingModel] = useState(false);
+
+  const getModelName = (mId: string) => {
+    const presets = providerPresetModels[formProvider] || [];
+    const match = presets.find((p) => p.id === mId);
+    return match ? match.name : mId;
+  };
 
   // Dynamic credentials from Credentials Management store
   const sharedCreds = getSharedCredentials();
@@ -409,6 +416,7 @@ export default function ModelManagement() {
     setFormProvider("OpenAI");
     setSelectedModelIds(["GPT-4o-2026-08"]);
     setFormModelAlias("GPT-4o Mini");
+    setFormModelAliases({ "GPT-4o-2026-08": "GPT-4o Mini" });
     setFormCredentialSource("existing");
     setTestStatus("none");
     setTestConnectionMessage("");
@@ -422,6 +430,7 @@ export default function ModelManagement() {
     setFormProvider(model.provider);
     setSelectedModelIds([model.name]);
     setFormModelAlias(model.alias);
+    setFormModelAliases({ [model.name]: model.alias });
     setFormCredentialSource(model.credentialSource || "existing");
     setFormCredentialId(model.credentialId || "");
     setFormApiBaseUrl(model.apiBaseUrl || "https://api.openai.com/v1");
@@ -438,6 +447,7 @@ export default function ModelManagement() {
     if (presets.length > 0) {
       setSelectedModelIds([presets[0].id]);
       setFormModelAlias(presets[0].name);
+      setFormModelAliases({ [presets[0].id]: presets[0].name });
     }
   };
 
@@ -448,7 +458,14 @@ export default function ModelManagement() {
         setSelectedModelIds(selectedModelIds.filter((id) => id !== mId));
       }
     } else {
-      setSelectedModelIds([...selectedModelIds, mId]);
+      const newSelected = [...selectedModelIds, mId];
+      setSelectedModelIds(newSelected);
+      if (!formModelAliases[mId]) {
+        const presets = providerPresetModels[formProvider] || [];
+        const match = presets.find((p) => p.id === mId);
+        const name = match ? match.name : mId;
+        setFormModelAliases((prev) => ({ ...prev, [mId]: name }));
+      }
     }
   };
 
@@ -514,14 +531,16 @@ export default function ModelManagement() {
       const nowStr = `${formatDateDisplay(todayDate)} 11:45 AM`;
 
       if (isEditMode && editingModel) {
+        const targetModel = selectedModelIds[0] || editingModel.name;
+        const aliasToSave = (formModelAliases[targetModel] || formModelAlias || editingModel.alias).trim();
         setModels((prev) =>
           prev.map((item) =>
             item.id === editingModel.id
               ? {
                   ...item,
                   provider: formProvider,
-                  name: selectedModelIds[0] || item.name,
-                  alias: formModelAlias.trim() || item.alias,
+                  name: targetModel,
+                  alias: aliasToSave,
                   credentialSource: formCredentialSource,
                   credentialId: formCredentialId,
                   apiBaseUrl: formApiBaseUrl,
@@ -537,12 +556,13 @@ export default function ModelManagement() {
         const newItems: ModelItem[] = selectedModelIds.map((mId, idx) => {
           const match = presets.find((p) => p.id === mId);
           const randHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+          const modelAlias = (formModelAliases[mId] || (match ? match.name : mId)).trim();
           return {
             id: `mod-${Date.now()}-${idx}`,
             modelId: `mdl-${randHex}`,
             provider: formProvider,
             name: mId,
-            alias: selectedModelIds.length === 1 && formModelAlias.trim() ? formModelAlias.trim() : mId,
+            alias: modelAlias,
             createdBy: "John Doe",
             createdOn: todayDate,
             inputCost: match ? match.inCost : 0.0015,
@@ -1193,18 +1213,55 @@ export default function ModelManagement() {
           </FormSection>
 
           {/* Model Alias */}
-          <FormSection title="Model Alias">
-            <FormField>
-              <FormLabel htmlFor="model-alias-input">Business Alias / Display Name</FormLabel>
-              <FormInput
-                id="model-alias-input"
-                type="text"
-                placeholder="e.g. GPT-4o Mini, Sales GPT, Support Assistant"
-                value={formModelAlias}
-                onChange={(e) => setFormModelAlias(e.target.value)}
-              />
-              <p className="text-[11px] text-neutral-400 mt-1">User-friendly business name shown across the portal.</p>
-            </FormField>
+          <FormSection title={selectedModelIds.length > 1 ? `Model Aliases (${selectedModelIds.length} Selected)` : "Model Alias"}>
+            {selectedModelIds.length <= 1 ? (
+              <FormField>
+                <FormLabel htmlFor="model-alias-input">Business Alias / Display Name</FormLabel>
+                <FormInput
+                  id="model-alias-input"
+                  type="text"
+                  placeholder="e.g. GPT-4o Mini, Sales GPT, Support Assistant"
+                  value={formModelAliases[selectedModelIds[0]] !== undefined ? formModelAliases[selectedModelIds[0]] : formModelAlias}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormModelAlias(val);
+                    if (selectedModelIds[0]) {
+                      setFormModelAliases((prev) => ({ ...prev, [selectedModelIds[0]]: val }));
+                    }
+                  }}
+                />
+                <p className="text-[11px] text-neutral-400 mt-1">User-friendly business name shown across the portal.</p>
+              </FormField>
+            ) : (
+              <div className="space-y-3 pt-1">
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
+                  Configure individual business alias / display name for each selected model:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectedModelIds.map((mId) => {
+                    const modelName = getModelName(mId);
+                    const currentAlias = formModelAliases[mId] !== undefined ? formModelAliases[mId] : modelName;
+                    return (
+                      <FormField key={mId} className="bg-neutral-50 dark:bg-neutral-900/60 p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 space-y-1.5">
+                        <FormLabel htmlFor={`alias-${mId}`} className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                          Alias for <span className="font-mono text-primary-600 dark:text-primary-400 font-bold">{modelName}</span>
+                        </FormLabel>
+                        <FormInput
+                          id={`alias-${mId}`}
+                          type="text"
+                          placeholder={`Alias for ${modelName}`}
+                          value={currentAlias}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormModelAliases((prev) => ({ ...prev, [mId]: val }));
+                          }}
+                        />
+                      </FormField>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </FormSection>
 
           {/* Step 4 & 7: Credential Selection */}

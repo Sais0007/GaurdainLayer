@@ -645,10 +645,10 @@ export default function TeamsManagement() {
   ]);
   const [formMaxBudget, setFormMaxBudget] = useState<number>(5000);
   const [formSoftBudget, setFormSoftBudget] = useState<number>(80);
-  const [formBudgetDuration, setFormBudgetDuration] = useState<"Monthly" | "Quarterly" | "Annual" | "Infinite">("Monthly");
+  const [formBudgetDuration, setFormBudgetDuration] = useState<string>("Lifetime");
   const [formTpmLimit, setFormTpmLimit] = useState<number>(500000);
   const [formRpmLimit, setFormRpmLimit] = useState<number>(5000);
-  const [formAlertEmails, setFormAlertEmails] = useState("john.doe@company.com");
+  const [formAlertEmails, setFormAlertEmails] = useState<string[]>(["john.doe@company.com"]);
 
   // --- Add User Dedicated Screen State ---
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -662,10 +662,10 @@ export default function TeamsManagement() {
     setFormAssignedProviders([{ provider: "OpenAI", selectedModels: ["GPT-4o", "GPT-4o Mini"] }]);
     setFormMaxBudget(5000);
     setFormSoftBudget(80);
-    setFormBudgetDuration("Monthly");
+    setFormBudgetDuration("Lifetime");
     setFormTpmLimit(500000);
     setFormRpmLimit(5000);
-    setFormAlertEmails("john.doe@company.com");
+    setFormAlertEmails(["john.doe@company.com"]);
     setViewState("create");
   };
 
@@ -679,10 +679,10 @@ export default function TeamsManagement() {
     );
     setFormMaxBudget(team.maxBudget);
     setFormSoftBudget(team.softBudgetPercent);
-    setFormBudgetDuration(team.budgetDuration);
+    setFormBudgetDuration(team.budgetDuration || "Lifetime");
     setFormTpmLimit(team.tpmLimit);
     setFormRpmLimit(team.rpmLimit);
-    setFormAlertEmails((team.alertEmails || []).join(", "));
+    setFormAlertEmails(team.alertEmails || ["john.doe@company.com"]);
     setViewState("edit");
   };
 
@@ -713,7 +713,7 @@ export default function TeamsManagement() {
         assignedProviders: formAssignedProviders,
         allowedModels: allowed,
         updatedDate: formattedDate,
-        alertEmails: formAlertEmails.split(",").map((e) => e.trim()).filter(Boolean),
+        alertEmails: formAlertEmails,
       };
 
       setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? updatedItem : t)));
@@ -753,7 +753,7 @@ export default function TeamsManagement() {
         mcpServers: [],
         agents: [],
         loggingIntegration: "Gateway Standard",
-        alertEmails: formAlertEmails.split(",").map((e) => e.trim()).filter(Boolean),
+        alertEmails: formAlertEmails,
       };
 
       setTeams((prev) => [newTeam, ...prev]);
@@ -1189,30 +1189,28 @@ export default function TeamsManagement() {
 
                 <div className="space-y-1">
                   <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                    Budget Reset Period
+                    Budget Reset Duration
                   </label>
                   <select
                     value={formBudgetDuration}
                     onChange={(e) => setFormBudgetDuration(e.target.value as any)}
                     className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl font-semibold text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500 cursor-pointer"
                   >
+                    <option value="Lifetime">Lifetime</option>
                     <option value="Monthly">Monthly</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Daily">Daily</option>
                     <option value="Quarterly">Quarterly</option>
-                    <option value="Annual">Annual</option>
-                    <option value="Infinite">Infinite</option>
+                    <option value="Yearly">Yearly</option>
                   </select>
                 </div>
 
-                <div className="space-y-1 md:col-span-3">
-                  <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                    Notification Alert Emails
-                  </label>
-                  <input
-                    type="text"
-                    value={formAlertEmails}
-                    onChange={(e) => setFormAlertEmails(e.target.value)}
-                    placeholder="Comma-separated emails e.g. lead@domain.com, admin@domain.com"
-                    className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
+                <div className="space-y-1 md:col-span-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                  <MultiEmailInput
+                    emails={formAlertEmails}
+                    onChange={setFormAlertEmails}
+                    label="Budget Notification Email"
+                    helpText="Recipients receive email notifications when Soft Budget or Maximum Budget is reached."
                   />
                 </div>
               </div>

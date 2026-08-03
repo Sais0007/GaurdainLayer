@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { MultiEmailInput } from "./TeamsManagement";
 import { 
   Plus, 
   Search, 
@@ -366,7 +367,8 @@ export default function VirtualKeyManagement() {
   const [formKeyType, setFormKeyType] = useState<"AI APIs" | "Management" | "Full Access">("AI APIs");
   const [formMaxBudget, setFormMaxBudget] = useState("500");
   const [formSoftBudget, setFormSoftBudget] = useState("400");
-  const [formBudgetCycle, setFormBudgetCycle] = useState("Monthly");
+  const [formBudgetCycle, setFormBudgetCycle] = useState("Lifetime");
+  const [formAlertEmails, setFormAlertEmails] = useState<string[]>(["john@company.com"]);
   const [formTpmLimit, setFormTpmLimit] = useState("100000");
   const [formRpmLimit, setFormRpmLimit] = useState("1000");
   const [formExpiryDuration, setFormExpiryDuration] = useState("Never");
@@ -487,7 +489,7 @@ export default function VirtualKeyManagement() {
     setAllModelsSelected(false);
     setFormMaxBudget("500");
     setFormSoftBudget("400");
-    setFormBudgetCycle("Monthly");
+    setFormBudgetCycle("Lifetime");
     setFormTpmLimit("100000");
     setFormRpmLimit("1000");
     setFormExpiryDuration("Never");
@@ -510,7 +512,7 @@ export default function VirtualKeyManagement() {
     setAllModelsSelected(keyItem.models.includes("All Models"));
     setFormMaxBudget(keyItem.maxBudget.toString());
     setFormSoftBudget((keyItem.maxBudget * 0.8).toString());
-    setFormBudgetCycle("Monthly");
+    setFormBudgetCycle("Lifetime");
     setFormTpmLimit(keyItem.tpmLimit.toString());
     setFormRpmLimit(keyItem.rpmLimit.toString());
     setFormExpiryDuration(keyItem.expiryDuration);
@@ -1463,15 +1465,6 @@ export default function VirtualKeyManagement() {
                   </div>
                 </div>
 
-                <div className="min-w-0">
-                  <div className="text-neutral-400 font-medium mb-1">Organization</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 min-w-0">
-                    <span className="truncate" title={selectedKey.organization}>{selectedKey.organization}</span>
-                    <button type="button" onClick={() => handleCopyText(selectedKey.orgId, "Copied successfully!")} title="Copy Org ID" className="shrink-0 p-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded">
-                      <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600 transition-colors" />
-                    </button>
-                  </div>
-                </div>
 
                 <div className="min-w-0">
                   <div className="text-neutral-400 font-medium mb-1">Team</div>
@@ -2085,19 +2078,7 @@ export default function VirtualKeyManagement() {
                     </select>
                   </div>
 
-                  {/* Organization (Read-Only) */}
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Organization <span className="text-neutral-400 font-normal">(Auto-Inherited from Team)</span>
-                    </label>
-                    <div className="h-10 px-3 bg-neutral-100 dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
-                      <Building2 className="w-3.5 h-3.5 text-neutral-400" />
-                      {formOrg}
-                      <span className="ml-auto text-[10px] font-normal px-2 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 rounded">
-                        Read Only
-                      </span>
-                    </div>
-                  </div>
+
                 </div>
               </div>
 
@@ -2330,32 +2311,35 @@ export default function VirtualKeyManagement() {
                     )}
                   </div>
 
-                  {/* Budget Reset Cycle */}
+                  {/* Budget Reset Duration */}
                   <div className="space-y-1">
                     <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Budget Reset Cycle
+                      Budget Reset Duration
                     </label>
                     <select
                       value={formBudgetCycle}
                       onChange={(e) => setFormBudgetCycle(e.target.value)}
                       className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
                     >
-                      <option value="Daily">Daily</option>
-                      <option value="Weekly">Weekly</option>
+                      <option value="Lifetime">Lifetime</option>
                       <option value="Monthly">Monthly</option>
+                      <option value="Weekly">Weekly</option>
+                      <option value="Daily">Daily</option>
                       <option value="Quarterly">Quarterly</option>
                       <option value="Yearly">Yearly</option>
-                      <option value="Never">Never (One-Time Cap)</option>
                     </select>
                     <p className="text-[11px] text-neutral-400">Resets accrued spend counter.</p>
                   </div>
                 </div>
 
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg flex items-center gap-2 text-amber-800 dark:text-amber-300 text-[11px]">
-                  <HelpCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                  <span>
-                    Soft budget alerts notify team owners via webhooks prior to API requests being hard-throttled at 100% cap.
-                  </span>
+                {/* Budget Notification Email */}
+                <div className="pt-3 border-t border-neutral-200/60 dark:border-neutral-800">
+                  <MultiEmailInput
+                    emails={formAlertEmails}
+                    onChange={setFormAlertEmails}
+                    label="Budget Notification Email"
+                    helpText="Recipients receive email notifications when Soft Budget or Maximum Budget is reached."
+                  />
                 </div>
               </div>
 

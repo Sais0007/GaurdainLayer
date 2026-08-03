@@ -1920,19 +1920,19 @@ export default function OrganizationManagement() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Reset Cycle</label>
+                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Budget Reset Duration</label>
                           <select
                             disabled
                             value={settingsResetCycle}
                             onChange={(e) => setSettingsResetCycle(e.target.value as any)}
                             className="w-full h-10 px-3 bg-neutral-100 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg font-medium text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
                           >
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
+                            <option value="Lifetime">Lifetime</option>
                             <option value="Monthly">Monthly</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Daily">Daily</option>
                             <option value="Quarterly">Quarterly</option>
                             <option value="Yearly">Yearly</option>
-                            <option value="Never">Never</option>
                           </select>
                         </div>
                       </div>

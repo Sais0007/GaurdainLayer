@@ -349,7 +349,7 @@ export default function UserManagement() {
   const [inviteMaxBudget, setInviteMaxBudget] = useState('500');
   const [inviteSoftBudget, setInviteSoftBudget] = useState('400');
   const [inviteAlertEmails, setInviteAlertEmails] = useState<string[]>(['john@company.com']);
-  const [inviteBudgetReset, setInviteBudgetReset] = useState('Monthly');
+  const [inviteBudgetReset, setInviteBudgetReset] = useState('Lifetime');
   const [inviteTouched, setInviteTouched] = useState(false);
   const [inviteIsSubmitting, setInviteIsSubmitting] = useState(false);
 
@@ -387,7 +387,7 @@ export default function UserManagement() {
   const [enableBulkBudget, setEnableBulkBudget] = useState(false);
   const [bulkUnlimitedBudget, setBulkUnlimitedBudget] = useState(false);
   const [bulkMaxBudget, setBulkMaxBudget] = useState('500');
-  const [bulkBudgetReset, setBulkBudgetReset] = useState('Monthly');
+  const [bulkBudgetReset, setBulkBudgetReset] = useState('Lifetime');
 
   const [enableBulkMetadata, setEnableBulkMetadata] = useState(false);
   const [bulkMetadata, setBulkMetadata] = useState('');
@@ -398,7 +398,7 @@ export default function UserManagement() {
   const [savedDefaultRoleOption, setSavedDefaultRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[3]);
   const [savedDefaultUnlimitedBudget, setSavedDefaultUnlimitedBudget] = useState(false);
   const [savedDefaultMaxBudget, setSavedDefaultMaxBudget] = useState('500');
-  const [savedDefaultBudgetReset, setSavedDefaultBudgetReset] = useState('Monthly');
+  const [savedDefaultBudgetReset, setSavedDefaultBudgetReset] = useState('Lifetime');
   const [savedDefaultModels, setSavedDefaultModels] = useState<string[]>(['gpt-4o', 'claude-3-5-sonnet']);
   const [savedDefaultTeams, setSavedDefaultTeams] = useState<string[]>(['AI Research']);
 
@@ -408,7 +408,7 @@ export default function UserManagement() {
   const [showEditRoleDropdown, setShowEditRoleDropdown] = useState(false);
   const [editDefaultUnlimitedBudget, setEditDefaultUnlimitedBudget] = useState(false);
   const [editDefaultMaxBudget, setEditDefaultMaxBudget] = useState('500');
-  const [editDefaultBudgetReset, setEditDefaultBudgetReset] = useState('Monthly');
+  const [editDefaultBudgetReset, setEditDefaultBudgetReset] = useState('Lifetime');
   const [editDefaultModels, setEditDefaultModels] = useState<string[]>(['gpt-4o', 'claude-3-5-sonnet']);
   const [editDefaultModelPreset, setEditDefaultModelPreset] = useState<'Configured Models' | 'All Proxy Models' | 'No Default Models'>('Configured Models');
   const [editDefaultTeams, setEditDefaultTeams] = useState<string[]>(['AI Research']);
@@ -741,7 +741,7 @@ export default function UserManagement() {
     setEnableBulkBudget(false);
     setBulkUnlimitedBudget(false);
     setBulkMaxBudget('500');
-    setBulkBudgetReset('Monthly');
+    setBulkBudgetReset('Lifetime');
     setEnableBulkMetadata(false);
     setBulkMetadata('');
     setShowBulkConfirmDialog(false);
@@ -828,7 +828,7 @@ export default function UserManagement() {
     setInviteMaxBudget('500');
     setInviteSoftBudget('400');
     setInviteAlertEmails(['john@company.com']);
-    setInviteBudgetReset('Monthly');
+    setInviteBudgetReset('Lifetime');
     setInviteTouched(false);
     setInviteIsSubmitting(false);
     setShowInviteModal(true);
@@ -1990,12 +1990,12 @@ export default function UserManagement() {
                       onChange={(e) => setEditDefaultBudgetReset(e.target.value)}
                       className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-900 dark:text-white"
                     >
-                      <option value="Daily">Daily</option>
-                      <option value="Weekly">Weekly</option>
+                      <option value="Lifetime">Lifetime</option>
                       <option value="Monthly">Monthly</option>
+                      <option value="Weekly">Weekly</option>
+                      <option value="Daily">Daily</option>
                       <option value="Quarterly">Quarterly</option>
                       <option value="Yearly">Yearly</option>
-                      <option value="Never">Never (One-Time Cap)</option>
                     </select>
                   </div>
                 </div>
@@ -2486,12 +2486,12 @@ export default function UserManagement() {
                       onChange={(e) => setInviteBudgetReset(e.target.value)}
                       className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-900 dark:text-white"
                     >
-                      <option value="Daily">Daily</option>
-                      <option value="Weekly">Weekly</option>
+                      <option value="Lifetime">Lifetime</option>
                       <option value="Monthly">Monthly</option>
+                      <option value="Weekly">Weekly</option>
+                      <option value="Daily">Daily</option>
                       <option value="Quarterly">Quarterly</option>
                       <option value="Yearly">Yearly</option>
-                      <option value="Never">Never (One-Time Cap)</option>
                     </select>
                   </div>
                 </div>
@@ -3014,12 +3014,12 @@ export default function UserManagement() {
                         onChange={(e) => setBulkBudgetReset(e.target.value)}
                         className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-900 dark:text-white"
                       >
-                        <option value="Daily">Daily</option>
-                        <option value="Weekly">Weekly</option>
+                        <option value="Lifetime">Lifetime</option>
                         <option value="Monthly">Monthly</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Daily">Daily</option>
                         <option value="Quarterly">Quarterly</option>
                         <option value="Yearly">Yearly</option>
-                        <option value="Never">Never (One-Time Cap)</option>
                       </select>
                     </div>
                   </div>

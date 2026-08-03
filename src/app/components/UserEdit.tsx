@@ -108,7 +108,7 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
   const [notificationEmails, setNotificationEmails] = useState<string[]>(
     user?.notificationEmails || [userEmail, "finance@company.com"]
   );
-  const [budgetResetDuration, setBudgetResetDuration] = useState(user?.budgetDuration || "Monthly");
+  const [budgetResetDuration, setBudgetResetDuration] = useState(user?.budgetDuration || "Lifetime");
 
   // Form Interactions
   const [touched, setTouched] = useState(false);
@@ -567,12 +567,12 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
                 onChange={(e) => setBudgetResetDuration(e.target.value)}
                 className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-semibold text-neutral-900 dark:text-white"
               >
-                <option value="Daily">Daily</option>
-                <option value="Weekly">Weekly</option>
+                <option value="Lifetime">Lifetime</option>
                 <option value="Monthly">Monthly</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Daily">Daily</option>
                 <option value="Quarterly">Quarterly</option>
                 <option value="Yearly">Yearly</option>
-                <option value="Never">Never (One-Time Cap)</option>
               </select>
             </div>
           </div>
@@ -582,8 +582,8 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
             <MultiEmailInput
               emails={notificationEmails}
               onChange={setNotificationEmails}
-              label="Notification Emails"
-              helpText="Recipients receive email notifications when Soft Budget or Maximum Budget threshold is reached."
+              label="Budget Notification Email"
+              helpText="Recipients receive email notifications when Soft Budget or Maximum Budget is reached."
             />
           </div>
         </div>

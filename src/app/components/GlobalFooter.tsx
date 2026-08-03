@@ -18,7 +18,7 @@ export function GlobalFooter({ isSidebarCollapsed, menuOrientation }: GlobalFoot
     >
       <div className="px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
         <div className="text-center sm:text-left">
-          &copy; 2026 HB Admin Template. All Rights Reserved.
+          &copy; 2026 Organization Admin - GL. All Rights Reserved.
         </div>
         <div className="text-center sm:text-right">
           Designed and Developed by{' '}

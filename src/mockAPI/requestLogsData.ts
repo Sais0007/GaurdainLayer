@@ -81,12 +81,20 @@ export interface RequestLogItem {
 
 export interface AuditLogItem {
   id: string;
-  user: string;
-  action: string;
-  resource: string;
   timestamp: string;
-  details: string;
-  ipAddress: string;
+  action: "Created" | "Updated" | "Deleted";
+  table: string;
+  objectId: string;
+  changedBy: string;
+  apiKeyHash?: string;
+  transactionId?: string;
+  requestSource?: string;
+  environment?: string;
+  organization?: string;
+  team?: string;
+  user?: string;
+  beforeState?: Record<string, any> | null;
+  afterState?: Record<string, any> | null;
 }
 
 export interface DeletedKeyItem {
@@ -661,22 +669,309 @@ for (let i = 1; i <= 45; i++) {
 
 export const mockAuditLogs: AuditLogItem[] = [
   {
-    id: "AUD-901",
-    user: "John Doe (Super Admin)",
-    action: "Updated Model Settings",
-    resource: "GPT-4o Gateway Config",
-    timestamp: "Jul 31, 2026 14:10:00",
-    details: "Changed TPM limit from 500k to 1,000k",
-    ipAddress: "192.168.1.101"
+    id: "AUD-1001",
+    timestamp: "Aug 3, 2026 19:29:52",
+    action: "Updated",
+    table: "Users",
+    objectId: "default_user_id",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "-",
+    transactionId: "tx-aud-9901-users",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "DevOps",
+    user: "default_user_id",
+    beforeState: {
+      updated_at: "2026-08-03T11:18:12.680000Z"
+    },
+    afterState: {
+      updated_at: "2026-08-03T13:59:51.993000Z"
+    }
   },
   {
-    id: "AUD-902",
-    user: "Sarah Connor (Org Admin)",
-    action: "Revoked Virtual Key",
-    resource: "CRM KEY (Key Hash: 098b9ac14...)",
-    timestamp: "Jul 30, 2026 18:45:12",
-    details: "Virtual key expired and manually revoked",
-    ipAddress: "10.0.4.12"
+    id: "AUD-1002",
+    timestamp: "Aug 3, 2026 16:47:32",
+    action: "Updated",
+    table: "Users",
+    objectId: "default_user_id",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "-",
+    transactionId: "tx-aud-9902-users",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "DevOps",
+    user: "default_user_id",
+    beforeState: {
+      user_id: "default_user_id",
+      max_budget: 1000,
+      updated_at: "2026-08-03T10:12:00.000000Z"
+    },
+    afterState: {
+      user_id: "default_user_id",
+      max_budget: 1500,
+      updated_at: "2026-08-03T16:47:32.000000Z"
+    }
+  },
+  {
+    id: "AUD-1003",
+    timestamp: "Aug 3, 2026 16:12:57",
+    action: "Updated",
+    table: "Users",
+    objectId: "default_user_id",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "-",
+    transactionId: "tx-aud-9903-users",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "DevOps",
+    user: "default_user_id",
+    beforeState: {
+      user_role: "User",
+      teams: ["DevOps"]
+    },
+    afterState: {
+      user_role: "Team Admin",
+      teams: ["DevOps", "Engineering"]
+    }
+  },
+  {
+    id: "AUD-1004",
+    timestamp: "Jul 29, 2026 18:08:09",
+    action: "Updated",
+    table: "UI Settings",
+    objectId: "ui_settings",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "b9042ff8a38e763b25e4da36b5c826b17c78d0b75c88853fbcidb9caa5d0dz8f4",
+    transactionId: "tx-aud-9904-ui",
+    requestSource: "Gateway Config API",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "Platform Ops",
+    beforeState: {
+      theme: "light",
+      auto_refresh_interval: 30
+    },
+    afterState: {
+      theme: "system",
+      auto_refresh_interval: 15
+    }
+  },
+  {
+    id: "AUD-1005",
+    timestamp: "Jul 29, 2026 17:40:54",
+    action: "Deleted",
+    table: "Users",
+    objectId: "your-user-id",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "b9042ff8a38e763b25e4da36b5c826b17c78d0b75c88853fbcidb9caa5d0dz8f4",
+    transactionId: "tx-aud-9905-deluser",
+    requestSource: "Admin API",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "Security",
+    user: "your-user-id",
+    beforeState: {
+      spend: 0,
+      teams: [],
+      models: [],
+      user_id: "your-user-id",
+      metadata: {},
+      policies: [],
+      created_at: "2026-07-28T15:07:14.163000Z",
+      updated_at: "2026-07-28T15:08:01.910000Z",
+      model_spend: {},
+      model_max_budget: {},
+      allowed_cache_controls: []
+    },
+    afterState: null
+  },
+  {
+    id: "AUD-1006",
+    timestamp: "Jul 29, 2026 17:40:50",
+    action: "Deleted",
+    table: "Users",
+    objectId: "test-user",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "b9042ff8a38e763b25e4da36b5c826b17c78d0b75c88853fbcidb9caa5d0dz8f4",
+    transactionId: "tx-aud-9906-deltest",
+    requestSource: "Admin API",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "Testing",
+    user: "test-user",
+    beforeState: {
+      spend: 12.5,
+      user_id: "test-user",
+      status: "Inactive",
+      created_at: "2026-07-25T10:00:00.000000Z"
+    },
+    afterState: null
+  },
+  {
+    id: "AUD-1007",
+    timestamp: "Jul 29, 2026 14:37:35",
+    action: "Deleted",
+    table: "Teams",
+    objectId: "840aea50-fec4-4629-8c03-323e44753ae9",
+    changedBy: "b90438fc-1e68-40aa-a553-d7e90e3ff804",
+    apiKeyHash: "098b9ac14c52a807846a35533383f982a1d4798b057b68ba1c76db4258dc1708",
+    transactionId: "tx-aud-9907-delteam",
+    requestSource: "Gateway CLI",
+    environment: "staging",
+    organization: "HB Enterprise",
+    team: "Legacy Team",
+    beforeState: {
+      team_id: "840aea50-fec4-4629-8c03-323e44753ae9",
+      team_alias: "Legacy Team",
+      members: ["m-101", "m-102"],
+      organization_id: "org-101"
+    },
+    afterState: null
+  },
+  {
+    id: "AUD-1008",
+    timestamp: "Jul 29, 2026 14:37:05",
+    action: "Created",
+    table: "Teams",
+    objectId: "b1eaee50-fec4-4629-8c03-323e44753ae9",
+    changedBy: "b90438fc-1e68-40aa-a553-d7e90e3ff804",
+    apiKeyHash: "098b9ac14c52a807846a35533383f982a1d4798b057b68ba1c76db4258dc1708",
+    transactionId: "tx-aud-9908-newteam",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "Engineering",
+    beforeState: null,
+    afterState: {
+      admins: [],
+      models: ["all-proxy-models"],
+      blocked: false,
+      members: [],
+      team_id: "04eaea50-fec4-4629-8c03-323e44753ae9",
+      team_alias: "asdfdsefasdf",
+      model_spend: {},
+      organization_id: "8ec41e08-0174-4a5a-9086-145671ba0ff1",
+      model_max_budget: {},
+      members_with_roles: [],
+      allow_team_guardrail_config: false
+    }
+  },
+  {
+    id: "AUD-1009",
+    timestamp: "Jul 29, 2026 12:41:51",
+    action: "Updated",
+    table: "Users",
+    objectId: "b90438fc-1e68-40aa-a553-d7e90e3ff804",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "41d5d0fbafe82...",
+    transactionId: "tx-aud-9909-userupd",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "AI Research",
+    beforeState: {
+      user_id: "b90438fc-1e68-40aa-a553-d7e90e3ff804",
+      user_role: "User",
+      budget_usd: 500
+    },
+    afterState: {
+      user_id: "b90438fc-1e68-40aa-a553-d7e90e3ff804",
+      user_role: "Admin",
+      budget_usd: 2000
+    }
+  },
+  {
+    id: "AUD-1010",
+    timestamp: "Jul 29, 2026 12:41:01",
+    action: "Created",
+    table: "Models",
+    objectId: "73162c3a-0804-434d-8b59-e27a0ded4ac4",
+    changedBy: "b90438fc-1e68-40aa-a553-d7e90e3ff804",
+    apiKeyHash: "5c18affd8fb96...",
+    transactionId: "tx-aud-9910-newmod",
+    requestSource: "Gateway Admin API",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "AI Infrastructure",
+    beforeState: null,
+    afterState: {
+      model_name: "claude-3-5-sonnet",
+      litellm_params: {
+        model: "anthropic/claude-3-5-sonnet",
+        api_base: "https://api.anthropic.com"
+      },
+      model_info: {
+        id: "73162c3a-0804-434d-8b59-e27a0ded4ac4",
+        mode: "chat"
+      }
+    }
+  },
+  {
+    id: "AUD-1011",
+    timestamp: "Jul 28, 2026 20:48:23",
+    action: "Created",
+    table: "Teams",
+    objectId: "1680c0a2-c7a6-400f-a0fa-7158222c8bc9",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "c991a7f848429...",
+    transactionId: "tx-aud-9911-teamcr",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "DevOps",
+    beforeState: null,
+    afterState: {
+      team_id: "1680c0a2-c7a6-400f-a0fa-7158222c8bc9",
+      team_alias: "DevOps Platform",
+      max_budget: 5000,
+      tpm_limit: 500000
+    }
+  },
+  {
+    id: "AUD-1012",
+    timestamp: "Jul 28, 2026 17:06:02",
+    action: "Deleted",
+    table: "Keys",
+    objectId: "dd0dc03f5c9b9fa858c49f93839bd686391a...",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "7fed94bbfb8e9...",
+    transactionId: "tx-aud-9912-keydel",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "Security",
+    beforeState: {
+      key_name: "Staging-Test-Key",
+      key_hash: "dd0dc03f5c9b9fa858c49f93839bd686391a",
+      user_id: "usr-101",
+      max_budget: 200
+    },
+    afterState: null
+  },
+  {
+    id: "AUD-1013",
+    timestamp: "Jul 28, 2026 17:04:14",
+    action: "Created",
+    table: "Keys",
+    objectId: "dd0dc03f5c9b9fa858c49f93839bd686391a...",
+    changedBy: "Default Proxy Admin",
+    apiKeyHash: "7fed94bbfb8e9...",
+    transactionId: "tx-aud-9913-keycr",
+    requestSource: "Web Admin Portal",
+    environment: "production",
+    organization: "HB Enterprise",
+    team: "Security",
+    beforeState: null,
+    afterState: {
+      key_name: "Staging-Test-Key",
+      key_hash: "dd0dc03f5c9b9fa858c49f93839bd686391a",
+      user_id: "usr-101",
+      max_budget: 200,
+      soft_budget: 160
+    }
   }
 ];
 
