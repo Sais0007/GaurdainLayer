@@ -1511,118 +1511,81 @@ export default function VirtualKeyManagement() {
             {/* TAB 1: OVERVIEW                                                           */}
             {/* ========================================================================= */}
             {detailTab === "overview" && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
-                <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-6 animate-fadeIn">
+                {/* Virtual Key Information Card */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-4 shadow-2xs">
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-primary-600" />
+                    Virtual Key Information
+                  </h3>
                   
-                  {/* Virtual Key Information Card */}
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-4 shadow-2xs">
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                      <KeyRound className="w-4 h-4 text-primary-600" />
-                      Virtual Key Information
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div className="sm:col-span-2">
-                        <div className="text-neutral-400 font-medium mb-0.5">Secret Key</div>
-                        <div className="font-mono font-medium text-neutral-800 dark:text-neutral-200 flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200/60 dark:border-neutral-700">
-                          <span className="truncate">{selectedKey.secretKeyMasked}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => handleCopyText("sk-litellm-512360370354dc140e72731f224b1916bee2a8e2920a71269250fde479762a1a", "Copied successfully!")}
-                            className="text-neutral-400 hover:text-primary-600 p-1"
-                            title="Copy Full Secret Key"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Budget & Usage Card with Spend Progress Bar */}
-                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-4 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-emerald-600" />
-                        Budget & Spend Cap Progress
-                      </h3>
-                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                        28.5% Used
-                      </span>
-                    </div>
-
-                    {/* Spend Progress Bar */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-neutral-600 dark:text-neutral-400">Current Spend: ${selectedKey.currentSpend.toFixed(2)}</span>
-                        <span className="text-neutral-900 dark:text-white">Max Cap: ${selectedKey.maxBudget.toFixed(2)}</span>
-                      </div>
-                      <div className="w-full h-3 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary-600 rounded-full transition-all duration-500" style={{ width: "28.5%" }} />
-                      </div>
-                      <div className="flex justify-between text-[11px] text-neutral-400">
-                        <span>Remaining Budget: ${(selectedKey.maxBudget - selectedKey.currentSpend).toFixed(2)}</span>
-                        <span>Reset Schedule: Monthly on 1st</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Rate Limits & Auto Rotation Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-2">
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                        <Activity className="w-4 h-4 text-blue-600" />
-                        Rate Limits & Throughput
-                      </h4>
-                      <div className="space-y-1 text-xs pt-1">
-                        <div className="flex justify-between"><span className="text-neutral-400">TPM Limit:</span> <span className="font-mono font-semibold">{selectedKey.tpmLimit.toLocaleString()} Tokens/min</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-400">RPM Limit:</span> <span className="font-mono font-semibold">{selectedKey.rpmLimit.toLocaleString()} Reqs/min</span></div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-2">
-                      <h4 className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                        <RotateCw className="w-4 h-4 text-purple-600" />
-                        Auto Rotation Settings
-                      </h4>
-                      <div className="space-y-1 text-xs pt-1">
-                        <div className="flex justify-between"><span className="text-neutral-400">Status:</span> <span className="font-semibold text-emerald-600">Enabled</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-400">Rotation Cycle:</span> <span className="font-semibold">Every 90 Days</span></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="sm:col-span-2">
+                      <div className="text-neutral-400 font-medium mb-0.5">Secret Key</div>
+                      <div className="font-mono font-medium text-neutral-800 dark:text-neutral-200 flex items-center gap-2 bg-neutral-50 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200/60 dark:border-neutral-700">
+                        <span className="truncate">{selectedKey.secretKeyMasked}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => handleCopyText("sk-litellm-512360370354dc140e72731f224b1916bee2a8e2920a71269250fde479762a1a", "Copied successfully!")}
+                          className="text-neutral-400 hover:text-primary-600 p-1"
+                          title="Copy Full Secret Key"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Right Timeline Card */}
-                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-4">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary-600" />
-                    Timeline Card (Recent Activity)
-                  </h3>
+                {/* Budget & Usage Card with Spend Progress Bar */}
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-emerald-600" />
+                      Budget & Spend Cap Progress
+                    </h3>
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      28.5% Used
+                    </span>
+                  </div>
 
-                  <div className="space-y-4 text-xs">
-                    <div className="border-l-2 border-primary-500 pl-3 space-y-0.5">
-                      <div className="font-semibold text-neutral-900 dark:text-white">API Usage Executed</div>
-                      <div className="text-neutral-500">gpt-4o completion request (2,450 tokens)</div>
-                      <div className="text-[10px] text-neutral-400">Jul 24, 2026 3:26 PM</div>
+                  {/* Spend Progress Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-neutral-600 dark:text-neutral-400">Current Spend: ${selectedKey.currentSpend.toFixed(2)}</span>
+                      <span className="text-neutral-900 dark:text-white">Max Cap: ${selectedKey.maxBudget.toFixed(2)}</span>
                     </div>
-
-                    <div className="border-l-2 border-emerald-500 pl-3 space-y-0.5">
-                      <div className="font-semibold text-neutral-900 dark:text-white">Budget Cap Updated</div>
-                      <div className="text-neutral-500">Cap set to $500.00 by {selectedKey.createdBy}</div>
-                      <div className="text-[10px] text-neutral-400">Jul 22, 2026 6:30 PM</div>
+                    <div className="w-full h-3 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary-600 rounded-full transition-all duration-500" style={{ width: "28.5%" }} />
                     </div>
-
-                    <div className="border-l-2 border-blue-500 pl-3 space-y-0.5">
-                      <div className="font-semibold text-neutral-900 dark:text-white">Security Policies Attached</div>
-                      <div className="text-neutral-500">Rate Limiting & IP Whitelist assigned</div>
-                      <div className="text-[10px] text-neutral-400">Jul 21, 2026 10:15 AM</div>
+                    <div className="flex justify-between text-[11px] text-neutral-400">
+                      <span>Remaining Budget: ${(selectedKey.maxBudget - selectedKey.currentSpend).toFixed(2)}</span>
+                      <span>Reset Schedule: Monthly on 1st</span>
                     </div>
+                  </div>
+                </div>
 
-                    <div className="border-l-2 border-purple-500 pl-3 space-y-0.5">
-                      <div className="font-semibold text-neutral-900 dark:text-white">Key Created</div>
-                      <div className="text-neutral-500">Provisioned for {selectedKey.organization}</div>
-                      <div className="text-[10px] text-neutral-400">{selectedKey.createdDate}</div>
+                {/* Rate Limits & Auto Rotation Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-2">
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-blue-600" />
+                      Rate Limits & Throughput
+                    </h4>
+                    <div className="space-y-1 text-xs pt-1">
+                      <div className="flex justify-between"><span className="text-neutral-400">TPM Limit:</span> <span className="font-mono font-semibold">{selectedKey.tpmLimit.toLocaleString()} Tokens/min</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-400">RPM Limit:</span> <span className="font-mono font-semibold">{selectedKey.rpmLimit.toLocaleString()} Reqs/min</span></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 space-y-2">
+                    <h4 className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                      <RotateCw className="w-4 h-4 text-purple-600" />
+                      Auto Rotation Settings
+                    </h4>
+                    <div className="space-y-1 text-xs pt-1">
+                      <div className="flex justify-between"><span className="text-neutral-400">Status:</span> <span className="font-semibold text-emerald-600">Enabled</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-400">Rotation Cycle:</span> <span className="font-semibold">Every 90 Days</span></div>
                     </div>
                   </div>
                 </div>
