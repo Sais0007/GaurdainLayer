@@ -268,8 +268,9 @@ export default function UserManagement() {
   const [usersList, setUsersList] = useState<InternalUser[]>(INITIAL_INTERNAL_USERS);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<'users' | 'default-settings'>('users');
+  // Header More Menu & Default Settings Modal State
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showDefaultUserSettingsModal, setShowDefaultUserSettingsModal] = useState(false);
 
   // Summary widgets state
   const [showSummary, setShowSummary] = useState(true);
@@ -373,7 +374,7 @@ export default function UserManagement() {
 
   // Activation Checkboxes for Bulk Edit Sections
   const [enableBulkRole, setEnableBulkRole] = useState(false);
-  const [bulkRoleOption, setBulkRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[3]);
+  const [bulkRoleOption, setBulkRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[1]);
   const [showBulkRoleDropdown, setShowBulkRoleDropdown] = useState(false);
 
   const [enableBulkTeams, setEnableBulkTeams] = useState(false);
@@ -395,7 +396,7 @@ export default function UserManagement() {
   const [bulkEditIsSubmitting, setBulkEditIsSubmitting] = useState(false);
 
   /* -------------------- DEFAULT USER SETTINGS STATE -------------------- */
-  const [savedDefaultRoleOption, setSavedDefaultRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[3]);
+  const [savedDefaultRoleOption, setSavedDefaultRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[1]);
   const [savedDefaultUnlimitedBudget, setSavedDefaultUnlimitedBudget] = useState(false);
   const [savedDefaultMaxBudget, setSavedDefaultMaxBudget] = useState('500');
   const [savedDefaultBudgetReset, setSavedDefaultBudgetReset] = useState('Lifetime');
@@ -404,7 +405,7 @@ export default function UserManagement() {
 
   // Settings Edit Mode
   const [isSettingsEditing, setIsSettingsEditing] = useState(false);
-  const [editDefaultRoleOption, setEditDefaultRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[3]);
+  const [editDefaultRoleOption, setEditDefaultRoleOption] = useState(AVAILABLE_ROLES_OPTIONS[1]);
   const [showEditRoleDropdown, setShowEditRoleDropdown] = useState(false);
   const [editDefaultUnlimitedBudget, setEditDefaultUnlimitedBudget] = useState(false);
   const [editDefaultMaxBudget, setEditDefaultMaxBudget] = useState('500');
@@ -459,6 +460,9 @@ export default function UserManagement() {
       }
       if (!target.closest('.bulk-team-select-dropdown')) {
         setShowBulkTeamDropdown(false);
+      }
+      if (!target.closest('.more-menu-container')) {
+        setShowMoreMenu(false);
       }
     };
     document.addEventListener('click', handleClickOutside);
@@ -732,7 +736,7 @@ export default function UserManagement() {
     }
 
     setEnableBulkRole(false);
-    setBulkRoleOption(AVAILABLE_ROLES_OPTIONS[3]);
+    setBulkRoleOption(AVAILABLE_ROLES_OPTIONS[1]);
     setEnableBulkTeams(false);
     setBulkTeams(['AI Research']);
     setEnableBulkModels(false);
@@ -1007,77 +1011,67 @@ export default function UserManagement() {
           </PrimaryButton>
 
           {/* Action 3: Multi-Select Mode Toggle / Bulk Edit */}
-          {activeTab === 'users' && (
-            isMultiSelectActive ? (
-              <>
-                <PrimaryButton
-                  icon={Edit3}
-                  disabled={selectedUserIds.size === 0}
-                  onClick={handleOpenBulkEditModal}
-                >
-                  Bulk Edit ({selectedUserIds.size} Selected)
-                </PrimaryButton>
-
-                <SecondaryButton
-                  icon={X}
-                  onClick={() => {
-                    setIsMultiSelectActive(false);
-                    setSelectedUserIds(new Set());
-                  }}
-                >
-                  Cancel Selection
-                </SecondaryButton>
-              </>
-            ) : (
-              <SecondaryButton
-                icon={CheckSquare}
-                onClick={() => setIsMultiSelectActive(true)}
+          {isMultiSelectActive ? (
+            <>
+              <PrimaryButton
+                icon={Edit3}
+                disabled={selectedUserIds.size === 0}
+                onClick={handleOpenBulkEditModal}
               >
-                Select Users
+                Bulk Edit ({selectedUserIds.size} Selected)
+              </PrimaryButton>
+
+              <SecondaryButton
+                icon={X}
+                onClick={() => {
+                  setIsMultiSelectActive(false);
+                  setSelectedUserIds(new Set());
+                }}
+              >
+                Cancel Selection
               </SecondaryButton>
-            )
+            </>
+          ) : (
+            <SecondaryButton
+              icon={CheckSquare}
+              onClick={() => setIsMultiSelectActive(true)}
+            >
+              Select Users
+            </SecondaryButton>
           )}
+
+          {/* Action 4: More (⋮) Overflow Menu */}
+          <div className="relative inline-block text-left more-menu-container">
+            <button
+              type="button"
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className="h-9 w-9 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center justify-center transition-colors shadow-2xs"
+              title="More Options"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {showMoreMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl py-1 z-50 animate-fadeIn">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    handleStartEditDefaultSettings();
+                    setShowDefaultUserSettingsModal(true);
+                  }}
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2 transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-neutral-500" />
+                  <span>Default User Settings</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </PageHeader>
 
-      {/* 2. TABS (Users & Default User Settings) */}
-      <div className="border-b border-neutral-200 dark:border-neutral-800">
-        <nav className="-mb-px flex gap-6 text-sm font-semibold" aria-label="Tabs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('users')}
-            className={`py-2.5 px-1 border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === 'users'
-                ? 'border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Users
-            <span className="px-2 py-0.5 rounded-full text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
-              {usersList.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('default-settings')}
-            className={`py-2.5 px-1 border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === 'default-settings'
-                ? 'border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
-            }`}
-          >
-            <Lock className="w-4 h-4" />
-            Default User Settings
-          </button>
-        </nav>
-      </div>
-
-      {/* TAB 1: USERS LISTING */}
-      {activeTab === 'users' && (
-        <>
-          {/* 3. SUMMARY KPI CARDS (Collapsible) */}
+      {/* 3. SUMMARY KPI CARDS (Collapsible) */}
           {showSummary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 transition-all duration-300 animate-fadeIn">
               {/* Total Users */}
@@ -1759,135 +1753,40 @@ export default function UserManagement() {
               </div>
             </div>
           </div>
-        </>
-      )}
 
-      {/* TAB 2: DEFAULT USER SETTINGS */}
-      {activeTab === 'default-settings' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 shadow-2xs flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200/60 dark:border-primary-800/60 flex items-center justify-center text-primary-600 dark:text-primary-400">
-                <Settings className="w-6 h-6" />
+      {/* ========================================================================= */}
+      {/* DEFAULT USER SETTINGS MODAL                                               */}
+      {/* ========================================================================= */}
+      {showDefaultUserSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl w-full max-w-2xl sm:max-w-3xl max-h-[90vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden my-auto">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200/60 dark:border-primary-800/60 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                    Default User Settings
+                  </h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    Configure default settings applied to newly created users.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                  Default User Settings
-                  {isSettingsEditing && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-                      Inline Edit Mode
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  Configure the default values automatically assigned when new internal users are created.
-                </p>
-              </div>
-            </div>
-
-            {!isSettingsEditing && (
-              <SecondaryButton
-                icon={Edit}
-                onClick={handleStartEditDefaultSettings}
+              <button
+                type="button"
+                onClick={() => setShowDefaultUserSettingsModal(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               >
-                Edit Settings
-              </SecondaryButton>
-            )}
-          </div>
-
-          {!isSettingsEditing ? (
-            <div className="space-y-4 text-xs">
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-neutral-100 dark:border-neutral-800">
-                  <Users className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">Default User Role</span>
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-neutral-900 dark:text-white">
-                    {savedDefaultRoleOption ? savedDefaultRoleOption.name : <span className="text-neutral-400 italic">Not Set</span>}
-                  </div>
-                  {savedDefaultRoleOption && (
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                      {savedDefaultRoleOption.description}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-neutral-100 dark:border-neutral-800">
-                  <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">Maximum Budget</span>
-                </div>
-                <div>
-                  {savedDefaultUnlimitedBudget ? (
-                    <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                      Unlimited
-                    </span>
-                  ) : savedDefaultMaxBudget ? (
-                    <span className="text-sm font-mono font-bold text-neutral-900 dark:text-white">
-                      ${savedDefaultMaxBudget}.00
-                    </span>
-                  ) : (
-                    <span className="text-neutral-400 italic">Not Set</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-neutral-100 dark:border-neutral-800">
-                  <RotateCcw className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">Budget Reset Duration</span>
-                </div>
-                <div className="text-sm font-semibold text-neutral-900 dark:text-white">
-                  {savedDefaultBudgetReset || <span className="text-neutral-400 italic">Not Set</span>}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-neutral-100 dark:border-neutral-800">
-                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">Default Personal Models</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {savedDefaultModels.length === 0 ? (
-                    <span className="text-neutral-400 italic">Not Set</span>
-                  ) : (
-                    savedDefaultModels.map((m) => (
-                      <span
-                        key={m}
-                        className="px-3 py-1 rounded-lg border text-xs font-semibold bg-primary-50 dark:bg-primary-950/60 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300"
-                      >
-                        {m}
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 shadow-2xs hover:shadow-xs transition-shadow">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-neutral-100 dark:border-neutral-800">
-                  <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">Default Assigned Teams</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {savedDefaultTeams.length === 0 ? (
-                    <span className="text-neutral-400 italic">Not Set</span>
-                  ) : (
-                    savedDefaultTeams.map((t) => (
-                      <span
-                        key={t}
-                        className="px-3 py-1 rounded-lg border text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
-                      >
-                        {t}
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ) : (
-            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-lg p-6 space-y-6 animate-fadeIn text-xs">
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs custom-scrollbar">
+              {/* 1. Default Role */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Users className="w-4 h-4 text-primary-600 dark:text-primary-400" />
@@ -1938,6 +1837,7 @@ export default function UserManagement() {
                 </div>
               </div>
 
+              {/* 2. Budget Configuration */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <div className="flex items-center gap-2">
@@ -2001,8 +1901,9 @@ export default function UserManagement() {
                 </div>
               </div>
 
+              {/* 3. Default Personal Models */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     <h4 className="font-bold text-sm text-neutral-900 dark:text-white">Default Personal Models</h4>
@@ -2062,6 +1963,7 @@ export default function UserManagement() {
                 </div>
               </div>
 
+              {/* 4. Default Assigned Teams */}
               <div className="bg-neutral-50/50 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-neutral-800">
                   <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -2130,27 +2032,40 @@ export default function UserManagement() {
                   )}
                 </div>
               </div>
-
-              <div className="sticky bottom-0 z-10 pt-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-white dark:bg-neutral-900 py-3">
-                <SecondaryButton onClick={handleCancelDefaultSettings}>
-                  Cancel
-                </SecondaryButton>
-
-                <PrimaryButton
-                  disabled={!isEditSettingsFormValid || editSettingsIsSaving}
-                  onClick={handleSaveDefaultSettings}
-                >
-                  {editSettingsIsSaving ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Saving Changes...
-                    </span>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </PrimaryButton>
-              </div>
             </div>
-          )}
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-end gap-3 bg-neutral-50 dark:bg-neutral-900/60 rounded-b-2xl flex-shrink-0">
+              <SecondaryButton onClick={() => setShowDefaultUserSettingsModal(false)}>
+                Cancel
+              </SecondaryButton>
+
+              <PrimaryButton
+                disabled={!isEditSettingsFormValid || editSettingsIsSaving}
+                onClick={async () => {
+                  setEditSettingsIsSaving(true);
+                  await new Promise((res) => setTimeout(res, 500));
+                  setSavedDefaultRoleOption(editDefaultRoleOption);
+                  setSavedDefaultUnlimitedBudget(editDefaultUnlimitedBudget);
+                  setSavedDefaultMaxBudget(editDefaultMaxBudget);
+                  setSavedDefaultBudgetReset(editDefaultBudgetReset);
+                  setSavedDefaultModels([...editDefaultModels]);
+                  setSavedDefaultTeams([...editDefaultTeams]);
+                  setEditSettingsIsSaving(false);
+                  setShowDefaultUserSettingsModal(false);
+                  toast.success("Default user settings updated successfully!");
+                }}
+              >
+                {editSettingsIsSaving ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Saving Settings...
+                  </span>
+                ) : (
+                  "Save Settings"
+                )}
+              </PrimaryButton>
+            </div>
+          </div>
         </div>
       )}
 

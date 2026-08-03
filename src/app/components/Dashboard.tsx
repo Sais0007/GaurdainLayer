@@ -1161,7 +1161,7 @@ function VirtualKeyAccordionCard({ vk, isExpanded, onToggle, state }: { vk: type
 // ==========================================
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('virtual-key-activity');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
   const [state, setState] = useState<DashboardState>('normal');
   const [timeRange, setTimeRange] = useState('30-days');
 
@@ -1321,37 +1321,34 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab('dashboard')}
               className={cn(
-                "pb-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2",
+                "pb-3 text-xs font-bold border-b-2 transition-all",
                 activeTab === 'dashboard'
                   ? "border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400"
                   : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
               )}
             >
-              <DollarSign className="w-4 h-4" />
               Dashboard (Cost Analytics)
             </button>
             <button
               onClick={() => setActiveTab('model-activity')}
               className={cn(
-                "pb-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2",
+                "pb-3 text-xs font-bold border-b-2 transition-all",
                 activeTab === 'model-activity'
                   ? "border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400"
                   : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
               )}
             >
-              <Cpu className="w-4 h-4" />
               Model Activity
             </button>
             <button
               onClick={() => setActiveTab('virtual-key-activity')}
               className={cn(
-                "pb-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2",
+                "pb-3 text-xs font-bold border-b-2 transition-all",
                 activeTab === 'virtual-key-activity'
                   ? "border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400"
                   : "border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
               )}
             >
-              <Key className="w-4 h-4" />
               Virtual Key Activity
             </button>
           </div>

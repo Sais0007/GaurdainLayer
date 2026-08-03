@@ -176,7 +176,7 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
       </PageHeader>
 
       {/* 2. USER HEADER CARD */}
-      <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 shadow-2xs flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-950/60 border border-primary-200/60 dark:border-primary-800/60 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-lg">
             {userAlias.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
@@ -202,19 +202,6 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
               User ID: {userId}
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <SecondaryButton onClick={onBack}>
-            Cancel
-          </SecondaryButton>
-          <PrimaryButton
-            icon={Save}
-            disabled={!isFormValid || isSaving}
-            onClick={handleSave}
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </PrimaryButton>
         </div>
       </div>
 
@@ -587,21 +574,6 @@ export default function UserEdit({ user, onBack }: UserEditProps) {
             />
           </div>
         </div>
-      </div>
-
-      {/* 4. STICKY FOOTER ACTION BAR */}
-      <div className="sticky bottom-0 z-10 pt-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-white dark:bg-neutral-900 p-4 rounded-xl shadow-lg">
-        <SecondaryButton onClick={onBack}>
-          Cancel
-        </SecondaryButton>
-
-        <PrimaryButton
-          icon={Save}
-          disabled={!isFormValid || isSaving}
-          onClick={handleSave}
-        >
-          {isSaving ? "Saving Changes..." : "Save Changes"}
-        </PrimaryButton>
       </div>
     </div>
   );
