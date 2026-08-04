@@ -22,6 +22,8 @@ import {
   KeyRound, 
   Building2, 
   Users, 
+  User,
+  UserPlus,
   AlertTriangle, 
   X, 
   HelpCircle,
@@ -91,20 +93,22 @@ export interface VirtualKey {
 
 // Dropdown Option Constants
 const AVAILABLE_OWNERS = [
+  "Finance Lead",
+  "John Doe",
+  "Alex Dev",
+  "Sarah Lead",
   "hbadmin@yopmail.com",
   "superadmin@spinecloudiq.com",
-  "alex.dev@hb.com",
-  "sarah.connor@hb.com",
-  "michael.scott@hb.com",
 ];
 
 const AVAILABLE_TEAMS = [
   { name: "AI Research", org: "HB Enterprise", defaultPolicies: ["Rate Limiting", "IP Whitelist"] },
+  { name: "Engineering", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
   { name: "DevOps Core", org: "Spine CloudIQ", defaultPolicies: ["Cost Guard", "Geo Fence"] },
-  { name: "SecOps Team", org: "CyberShield Ltd", defaultPolicies: ["Rate Limiting", "PII Masking"] },
-  { name: "QA Testing", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
-  { name: "Frontend Platform", org: "HB Enterprise", defaultPolicies: ["Rate Limiting", "Caching"] },
-  { name: "Data Science", org: "Spine CloudIQ", defaultPolicies: ["Cost Guard", "Rate Limiting"] },
+  { name: "Marketing", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
+  { name: "Sales", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
+  { name: "Finance", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
+  { name: "DevOps", org: "HB Enterprise", defaultPolicies: ["Rate Limiting"] },
 ];
 
 const AVAILABLE_MODELS = [
@@ -348,7 +352,25 @@ export default function VirtualKeyManagement() {
   const [highlightedKeyId, setHighlightedKeyId] = useState<string | null>(null);
 
   // Form State
-  const [formOwner, setFormOwner] = useState("hbadmin@yopmail.com");
+  const [ownershipType, setOwnershipType] = useState<"user" | "team">("user");
+  const [initialOwnershipType, setInitialOwnershipType] = useState<"user" | "team">("user");
+  const [showReassignConfirmModal, setShowReassignConfirmModal] = useState(false);
+
+  // Dynamic lists for inline add actions
+  const [availableOwnersList, setAvailableOwnersList] = useState<string[]>(AVAILABLE_OWNERS);
+  const [availableTeamsList, setAvailableTeamsList] = useState(AVAILABLE_TEAMS);
+
+  // Overlay Modals State
+  const [showInviteUserModalOverlay, setShowInviteUserModalOverlay] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserRole, setNewUserRole] = useState("Internal User");
+
+  const [showCreateTeamModalOverlay, setShowCreateTeamModalOverlay] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newTeamDesc, setNewTeamDesc] = useState("");
+
+  const [formOwner, setFormOwner] = useState("Finance Lead");
   const [ownerSearch, setOwnerSearch] = useState("");
   const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
 
@@ -357,7 +379,22 @@ export default function VirtualKeyManagement() {
 
   const [formOwnerType, setFormOwnerType] = useState<"You" | "Another User">("You");
   const [formOrg, setFormOrg] = useState("HB Enterprise");
-  const [formTeam, setFormTeam] = useState("AI Research");
+  const [formTeam, setFormTeam] = useState("");
+
+  const handleSwitchOwnershipType = (type: "user" | "team") => {
+    setOwnershipType(type);
+    if (type === "user") {
+      setFormTeam("");
+      if (!formOwner) {
+        setFormOwner(availableOwnersList[0] || "Finance Lead");
+      }
+    } else {
+      setFormOwner("");
+      if (!formTeam) {
+        setFormTeam(availableTeamsList[0]?.name || "AI Research");
+      }
+    }
+  };
   const [formAlias, setFormAlias] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formModels, setFormModels] = useState<string[]>(["gpt-4o", "claude-3-5-sonnet"]);
@@ -464,25 +501,34 @@ export default function VirtualKeyManagement() {
     return isNaN(num) || num < 0;
   }, [formRpmLimit]);
 
+  const isOwnershipValid = useMemo(() => {
+    if (ownershipType === "user") return formOwner.trim().length > 0;
+    if (ownershipType === "team") return formTeam.trim().length > 0;
+    return false;
+  }, [ownershipType, formOwner, formTeam]);
+
   const isFormValid = useMemo(() => {
     return (
       formAlias.trim().length > 0 &&
       formAlias.length <= 100 &&
       !isDuplicateName &&
+      isOwnershipValid &&
       !isBudgetInvalid &&
       !isSoftBudgetInvalid &&
       !isTpmInvalid &&
       !isRpmInvalid
     );
-  }, [formAlias, isDuplicateName, isBudgetInvalid, isSoftBudgetInvalid, isTpmInvalid, isRpmInvalid]);
+  }, [formAlias, isDuplicateName, isOwnershipValid, isBudgetInvalid, isSoftBudgetInvalid, isTpmInvalid, isRpmInvalid]);
 
   const handleOpenCreateModal = () => {
     setIsEditMode(false);
     setSelectedKey(null);
+    setOwnershipType("user");
+    setInitialOwnershipType("user");
     setFormAlias("");
     setFormDescription("");
-    setFormOwner("hbadmin@yopmail.com");
-    setFormTeam("AI Research");
+    setFormOwner(availableOwnersList[0] || "Finance Lead");
+    setFormTeam("");
     setFormOrg("HB Enterprise");
     setFormKeyType("AI APIs");
     setFormModels(["gpt-4o", "claude-3-5-sonnet"]);
@@ -501,12 +547,19 @@ export default function VirtualKeyManagement() {
   const handleOpenEditModal = (keyItem: VirtualKey) => {
     setSelectedKey(keyItem);
     setIsEditMode(true);
+    
+    const isUserOwner = !!(keyItem.owner && keyItem.owner.trim());
+    const calculatedType: "user" | "team" = isUserOwner ? "user" : "team";
+    
+    setOwnershipType(calculatedType);
+    setInitialOwnershipType(calculatedType);
+
     setFormAlias(keyItem.alias);
     setFormDescription(keyItem.description || "");
-    setFormOwner(keyItem.owner || "hbadmin@yopmail.com");
+    setFormOwner(isUserOwner ? keyItem.owner : "");
+    setFormTeam(!isUserOwner ? keyItem.team : "");
     setFormOwnerType(keyItem.ownerType);
-    setFormOrg(keyItem.organization);
-    setFormTeam(keyItem.team);
+    setFormOrg(keyItem.organization || "HB Enterprise");
     setFormKeyType(keyItem.keyType);
     setFormModels(keyItem.models);
     setAllModelsSelected(keyItem.models.includes("All Models"));
@@ -529,7 +582,7 @@ export default function VirtualKeyManagement() {
 
   const handleSelectTeam = (teamName: string) => {
     setFormTeam(teamName);
-    const foundTeam = AVAILABLE_TEAMS.find((t) => t.name === teamName);
+    const foundTeam = availableTeamsList.find((t) => t.name === teamName);
     if (foundTeam) {
       setFormOrg(foundTeam.org);
       setFormPolicies(foundTeam.defaultPolicies);
@@ -542,13 +595,25 @@ export default function VirtualKeyManagement() {
     if (!isFormValid) {
       if (isDuplicateName) {
         toast.error("A Virtual Key with this name already exists.");
+      } else if (!isOwnershipValid) {
+        toast.error(ownershipType === "user" ? "Please select an assigned user." : "Please select an assigned team.");
       } else {
         toast.error("Please resolve all validation errors before proceeding.");
       }
       return;
     }
 
+    if (isEditMode && selectedKey && ownershipType !== initialOwnershipType) {
+      setShowReassignConfirmModal(true);
+      return;
+    }
+
+    executeSaveVirtualKey();
+  };
+
+  const executeSaveVirtualKey = () => {
     setIsGenerating(true);
+    setShowReassignConfirmModal(false);
 
     setTimeout(() => {
       if (isEditMode && selectedKey) {
@@ -559,9 +624,9 @@ export default function VirtualKeyManagement() {
                   ...k,
                   alias: formAlias.trim(),
                   description: formDescription.trim(),
-                  owner: formOwner,
+                  owner: ownershipType === "user" ? formOwner : "",
+                  team: ownershipType === "team" ? formTeam : "",
                   organization: formOrg,
-                  team: formTeam,
                   keyType: formKeyType,
                   models: allModelsSelected ? ["All Models"] : (formModels.length > 0 ? formModels : ["gpt-4o"]),
                   maxBudget: parseFloat(formMaxBudget) || 0,
@@ -582,48 +647,44 @@ export default function VirtualKeyManagement() {
         setHighlightedKeyId(selectedKey.id);
       } else {
         const newId = `vk-${Date.now()}`;
-        const newKeyItem: VirtualKey = {
+        const newKey: VirtualKey = {
           id: newId,
-          keyId: `${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
-          secretKeyMasked: "sk-litellm-" + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join("") + "••••••••••••••••",
+          keyId: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+          secretKeyMasked: `sk-litellm-${Math.random().toString(36).substring(2, 8)}••••••••••••••••••••••••`,
           alias: formAlias.trim(),
-          owner: formOwner,
-          ownerId: "usr-904128",
-          ownerType: formOwner === "hbadmin@yopmail.com" ? "You" : "Another User",
-          organization: formOrg,
+          description: formDescription.trim(),
+          owner: ownershipType === "user" ? formOwner : "",
+          team: ownershipType === "team" ? formTeam : "",
+          ownerId: ownershipType === "user" ? `usr-${Math.floor(100000 + Math.random() * 900000)}` : "",
+          ownerType: "You",
+          organization: "HB Enterprise",
           orgId: "org-57c860ac",
-          team: formTeam,
           keyType: formKeyType,
           models: allModelsSelected ? ["All Models"] : (formModels.length > 0 ? formModels : ["gpt-4o"]),
           maxBudget: parseFloat(formMaxBudget) || 500,
           currentSpend: 0,
-          status: "Active",
           tpmLimit: parseInt(formTpmLimit) || 100000,
           rpmLimit: parseInt(formRpmLimit) || 1000,
           expiryDuration: formExpiryDuration,
-          expiryDate: formExpiryDuration === "Never" ? "Never" : "Oct 24, 2026",
-          gracePeriod: "7 Days",
-          policies: formPolicies.length > 0 ? formPolicies : ["Rate Limiting"],
-          guardrails: ["PII Masking"],
-          loggingIntegration: "Splunk Enterprise",
-          autoRotation: true,
-          callbackUrl: "https://api.company.com/webhooks/ai-audit",
+          gracePeriod: formGracePeriod,
+          policies: formPolicies,
+          guardrails: formGuardrails,
+          loggingIntegration: formLogging,
+          autoRotation: formAutoRotation,
+          callbackUrl: formCallbackUrl,
+          status: "active",
           lastUsed: "Just now",
-          createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          createdBy: formOwner,
-          description: formDescription.trim(),
+          createdDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          createdBy: "superadmin@spinecloudiq.com",
         };
-        setKeys((prev) => [newKeyItem, ...prev]);
-        toast.success(`Virtual Key "${formAlias.trim()}" generated successfully!`);
+        setKeys((prev) => [newKey, ...prev]);
         setHighlightedKeyId(newId);
+        setTimeout(() => setHighlightedKeyId(null), 3000);
+        toast.success("Virtual Key created successfully!");
       }
 
       setIsGenerating(false);
       setShowCreateModal(false);
-
-      setTimeout(() => {
-        setHighlightedKeyId(null);
-      }, 4000);
     }, 600);
   };
 
@@ -1454,21 +1515,35 @@ export default function VirtualKeyManagement() {
               </div>
 
               {/* Comprehensive Metadata Header Summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-xs">
                 <div className="min-w-0">
-                  <div className="text-neutral-400 font-medium mb-1">Owner</div>
+                  <div className="text-neutral-400 font-medium mb-1">Ownership Type</div>
                   <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 min-w-0">
-                    <span className="truncate" title={selectedKey.owner}>{selectedKey.owner}</span>
-                    <button type="button" onClick={() => handleCopyText(selectedKey.ownerId, "Copied successfully!")} title="Copy Owner ID" className="shrink-0 p-0.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded">
-                      <Copy className="w-3 h-3 text-neutral-400 hover:text-primary-600 transition-colors" />
-                    </button>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      selectedKey.owner ? "bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800" : "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
+                    }`}>
+                      {selectedKey.owner ? "User" : "Team"}
+                    </span>
                   </div>
                 </div>
 
-
                 <div className="min-w-0">
-                  <div className="text-neutral-400 font-medium mb-1">Team</div>
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 truncate" title={selectedKey.team}>{selectedKey.team}</div>
+                  <div className="text-neutral-400 font-medium mb-1">
+                    {selectedKey.owner ? "Assigned User" : "Assigned Team"}
+                  </div>
+                  <div className="font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 min-w-0">
+                    {selectedKey.owner ? (
+                      <>
+                        <User className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400 shrink-0" />
+                        <span className="truncate" title={selectedKey.owner}>{selectedKey.owner}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <span className="truncate" title={selectedKey.team}>{selectedKey.team}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="min-w-0">
@@ -1914,113 +1989,229 @@ export default function VirtualKeyManagement() {
                     </div>
                   </div>
 
-                  {/* Owner (Searchable Dropdown) */}
-                  <div className="space-y-1 relative owner-dropdown-container">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Owner <span className="text-rose-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowOwnerDropdown(!showOwnerDropdown)}
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors"
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        <Users className="w-3.5 h-3.5 text-neutral-400" />
-                        {formOwner}
+                  {/* Key Ownership Section */}
+                  <div className="space-y-3 md:col-span-2 bg-white dark:bg-neutral-950 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-bold text-xs text-neutral-900 dark:text-white">
+                        Key Ownership <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Assign key to an individual User or Team
                       </span>
-                      <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
-                    </button>
+                    </div>
 
-                    {showOwnerDropdown && (
-                      <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-2 space-y-1 animate-fadeIn">
-                        <div className="relative mb-1">
-                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                          <input
-                            type="text"
-                            value={ownerSearch}
-                            onChange={(e) => setOwnerSearch(e.target.value)}
-                            placeholder="Search owners..."
-                            className="w-full h-8 pl-8 pr-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs"
-                          />
+                    {/* Radio Option Selector */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <label
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                          ownershipType === "user"
+                            ? "border-primary-500 bg-primary-50/60 dark:bg-primary-950/40 text-primary-900 dark:text-primary-100 ring-2 ring-primary-500/20 font-bold"
+                            : "border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 font-medium"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="ownershipType"
+                          value="user"
+                          checked={ownershipType === "user"}
+                          onChange={() => handleSwitchOwnershipType("user")}
+                          className="w-4 h-4 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-primary-600 dark:text-primary-400 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs block">User</span>
+                            <span className="text-[10px] text-neutral-500 dark:text-neutral-400 block font-normal">Individual user ownership</span>
+                          </div>
                         </div>
-                        <div className="max-h-36 overflow-y-auto space-y-0.5">
-                          {AVAILABLE_OWNERS.filter((o) =>
-                            o.toLowerCase().includes(ownerSearch.toLowerCase())
-                          ).map((ownerEmail) => (
-                            <button
-                              key={ownerEmail}
-                              type="button"
-                              onClick={() => {
-                                setFormOwner(ownerEmail);
-                                setShowOwnerDropdown(false);
-                              }}
-                              className={`w-full text-left px-2.5 py-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center justify-between text-xs transition-colors ${
-                                formOwner === ownerEmail ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400 font-semibold" : "text-neutral-700 dark:text-neutral-300"
-                              }`}
-                            >
-                              <span>{ownerEmail}</span>
-                              {formOwner === ownerEmail && <Check className="w-3.5 h-3.5 text-primary-600" />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      </label>
 
-                  {/* Team (Searchable Dropdown) */}
-                  <div className="space-y-1 relative team-dropdown-container">
-                    <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
-                      Team <span className="text-rose-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowTeamDropdown(!showTeamDropdown)}
-                      className="w-full h-10 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors"
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        <Users className="w-3.5 h-3.5 text-neutral-400" />
-                        {formTeam}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
-                    </button>
-
-                    {showTeamDropdown && (
-                      <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-2 space-y-1 animate-fadeIn">
-                        <div className="relative mb-1">
-                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                          <input
-                            type="text"
-                            value={teamSearch}
-                            onChange={(e) => setTeamSearch(e.target.value)}
-                            placeholder="Search teams..."
-                            className="w-full h-8 pl-8 pr-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs"
-                          />
+                      <label
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                          ownershipType === "team"
+                            ? "border-primary-500 bg-primary-50/60 dark:bg-primary-950/40 text-primary-900 dark:text-primary-100 ring-2 ring-primary-500/20 font-bold"
+                            : "border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 font-medium"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="ownershipType"
+                          value="team"
+                          checked={ownershipType === "team"}
+                          onChange={() => handleSwitchOwnershipType("team")}
+                          className="w-4 h-4 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                          <div>
+                            <span className="font-bold text-xs block">Team</span>
+                            <span className="text-[10px] text-neutral-500 dark:text-neutral-400 block font-normal">Shared team ownership</span>
+                          </div>
                         </div>
-                        <div className="max-h-36 overflow-y-auto space-y-0.5">
-                          {AVAILABLE_TEAMS.filter((t) =>
-                            t.name.toLowerCase().includes(teamSearch.toLowerCase())
-                          ).map((teamObj) => (
-                            <button
-                              key={teamObj.name}
-                              type="button"
-                              onClick={() => {
-                                handleSelectTeam(teamObj.name);
-                                setShowTeamDropdown(false);
-                              }}
-                              className={`w-full text-left px-2.5 py-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center justify-between text-xs transition-colors ${
-                                formTeam === teamObj.name ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400 font-semibold" : "text-neutral-700 dark:text-neutral-300"
-                              }`}
-                            >
-                              <div>
-                                <div>{teamObj.name}</div>
-                                <div className="text-[10px] text-neutral-400">{teamObj.org}</div>
+                      </label>
+                    </div>
+
+                    {/* Conditional Dropdown Section */}
+                    <div className="pt-2 transition-all">
+                      {ownershipType === "user" ? (
+                        <div className="space-y-1 relative owner-dropdown-container">
+                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                            Assigned User <span className="text-rose-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowOwnerDropdown(!showOwnerDropdown)}
+                            className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-medium text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors ${
+                              formTouched && !formOwner.trim() ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 truncate">
+                              <User className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400 shrink-0" />
+                              {formOwner || <span className="text-neutral-400 italic">Select Assigned User...</span>}
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
+                          </button>
+
+                          {showOwnerDropdown && (
+                            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-2 space-y-2 animate-fadeIn">
+                              <div className="relative">
+                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                                <input
+                                  type="text"
+                                  value={ownerSearch}
+                                  onChange={(e) => setOwnerSearch(e.target.value)}
+                                  placeholder="Search users..."
+                                  className="w-full h-8 pl-8 pr-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs"
+                                />
                               </div>
-                              {formTeam === teamObj.name && <Check className="w-3.5 h-3.5 text-primary-600" />}
-                            </button>
-                          ))}
+
+                              <div className="max-h-40 overflow-y-auto space-y-0.5 custom-scrollbar">
+                                {availableOwnersList.filter((o) =>
+                                  o.toLowerCase().includes(ownerSearch.toLowerCase())
+                                ).length > 0 ? (
+                                  availableOwnersList
+                                    .filter((o) => o.toLowerCase().includes(ownerSearch.toLowerCase()))
+                                    .map((ownerEmail) => (
+                                      <button
+                                        key={ownerEmail}
+                                        type="button"
+                                        onClick={() => {
+                                          setFormOwner(ownerEmail);
+                                          setShowOwnerDropdown(false);
+                                        }}
+                                        className={`w-full text-left px-2.5 py-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center justify-between text-xs transition-colors ${
+                                          formOwner === ownerEmail ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400 font-semibold" : "text-neutral-700 dark:text-neutral-300"
+                                        }`}
+                                      >
+                                        <span className="truncate">{ownerEmail}</span>
+                                        {formOwner === ownerEmail && <Check className="w-3.5 h-3.5 text-primary-600" />}
+                                      </button>
+                                    ))
+                                ) : (
+                                  <div className="p-3 text-center text-neutral-400 italic">
+                                    No users found.
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowOwnerDropdown(false);
+                                    setShowInviteUserModalOverlay(true);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center gap-1.5 transition-colors"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>+ Add New User</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="space-y-1 relative team-dropdown-container">
+                          <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                            Assigned Team <span className="text-rose-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowTeamDropdown(!showTeamDropdown)}
+                            className={`w-full h-10 px-3 bg-white dark:bg-neutral-950 border rounded-lg text-xs font-medium text-neutral-900 dark:text-white flex items-center justify-between hover:border-neutral-400 transition-colors ${
+                              formTouched && !formTeam.trim() ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20" : "border-neutral-300 dark:border-neutral-700"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 truncate">
+                              <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                              {formTeam || <span className="text-neutral-400 italic">Select Assigned Team...</span>}
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" />
+                          </button>
+
+                          {showTeamDropdown && (
+                            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl p-2 space-y-2 animate-fadeIn">
+                              <div className="relative">
+                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                                <input
+                                  type="text"
+                                  value={teamSearch}
+                                  onChange={(e) => setTeamSearch(e.target.value)}
+                                  placeholder="Search teams..."
+                                  className="w-full h-8 pl-8 pr-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs"
+                                />
+                              </div>
+
+                              <div className="max-h-40 overflow-y-auto space-y-0.5 custom-scrollbar">
+                                {availableTeamsList.filter((t) =>
+                                  t.name.toLowerCase().includes(teamSearch.toLowerCase())
+                                ).length > 0 ? (
+                                  availableTeamsList
+                                    .filter((t) => t.name.toLowerCase().includes(teamSearch.toLowerCase()))
+                                    .map((teamObj) => (
+                                      <button
+                                        key={teamObj.name}
+                                        type="button"
+                                        onClick={() => {
+                                          handleSelectTeam(teamObj.name);
+                                          setShowTeamDropdown(false);
+                                        }}
+                                        className={`w-full text-left px-2.5 py-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-950/50 flex items-center justify-between text-xs transition-colors ${
+                                          formTeam === teamObj.name ? "bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400 font-semibold" : "text-neutral-700 dark:text-neutral-300"
+                                        }`}
+                                      >
+                                        <div>
+                                          <div className="font-semibold">{teamObj.name}</div>
+                                          <div className="text-[10px] text-neutral-400">{teamObj.org}</div>
+                                        </div>
+                                        {formTeam === teamObj.name && <Check className="w-3.5 h-3.5 text-primary-600" />}
+                                      </button>
+                                    ))
+                                ) : (
+                                  <div className="p-3 text-center text-neutral-400 italic">
+                                    No teams found.
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowTeamDropdown(false);
+                                    setShowCreateTeamModalOverlay(true);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50 flex items-center gap-1.5 transition-colors"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>+ Add New Team</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Expiration Duration */}
@@ -2597,6 +2788,209 @@ export default function VirtualKeyManagement() {
                   Apply Filters
                 </PrimaryButton>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Overlay Modal: + Add New User */}
+      {showInviteUserModalOverlay && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 my-auto animate-scaleUp text-xs">
+            <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Invite & Add User</h3>
+                  <p className="text-[11px] text-neutral-500">Create user and auto-assign as key owner.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInviteUserModalOverlay(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="e.g. Finance Lead"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="e.g. finance.lead@fintech.com"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">User Role</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value)}
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white"
+                >
+                  <option value="Internal User">Internal User</option>
+                  <option value="Organization Admin">Organization Admin</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+              <SecondaryButton onClick={() => setShowInviteUserModalOverlay(false)}>
+                Cancel
+              </SecondaryButton>
+              <PrimaryButton
+                disabled={!newUserName.trim() || !newUserEmail.trim()}
+                onClick={() => {
+                  const addedUserStr = `${newUserName.trim()} (${newUserEmail.trim()})`;
+                  setAvailableOwnersList((prev) => [addedUserStr, ...prev]);
+                  setFormOwner(addedUserStr);
+                  setShowInviteUserModalOverlay(false);
+                  setNewUserName("");
+                  setNewUserEmail("");
+                  toast.success(`User "${newUserName.trim()}" created and auto-assigned as key owner!`);
+                }}
+              >
+                Create & Auto-Select
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Overlay Modal: + Add New Team */}
+      {showCreateTeamModalOverlay && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 my-auto animate-scaleUp text-xs">
+            <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Create New Team</h3>
+                  <p className="text-[11px] text-neutral-500">Create team and auto-assign as key owner.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateTeamModalOverlay(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Team Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="e.g. Engineering, Sales, Marketing"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Description</label>
+                <textarea
+                  value={newTeamDesc}
+                  onChange={(e) => setNewTeamDesc(e.target.value)}
+                  placeholder="Describe team function or project scope..."
+                  rows={2}
+                  className="w-full p-2 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs text-neutral-900 dark:text-white resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+              <SecondaryButton onClick={() => setShowCreateTeamModalOverlay(false)}>
+                Cancel
+              </SecondaryButton>
+              <PrimaryButton
+                disabled={!newTeamName.trim()}
+                onClick={() => {
+                  const teamObj = {
+                    name: newTeamName.trim(),
+                    org: "HB Enterprise",
+                    defaultPolicies: ["Rate Limiting"],
+                  };
+                  setAvailableTeamsList((prev) => [teamObj, ...prev]);
+                  handleSelectTeam(teamObj.name);
+                  setShowCreateTeamModalOverlay(false);
+                  setNewTeamName("");
+                  setNewTeamDesc("");
+                  toast.success(`Team "${teamObj.name}" created and auto-assigned as key owner!`);
+                }}
+              >
+                Create & Auto-Select
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Ownership Reassignment */}
+      {showReassignConfirmModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 my-auto text-xs animate-scaleUp">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Confirm Ownership Reassignment</h3>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  You are changing the ownership type of this Virtual Key.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-xl space-y-1">
+              <p className="font-semibold text-xs flex items-center gap-1.5 text-amber-950 dark:text-amber-100">
+                <span>Ownership Transfer Warning</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                Changing ownership will reassign this Virtual Key from the current owner (<strong>{initialOwnershipType === "user" ? selectedKey?.owner : selectedKey?.team}</strong>) to the selected owner (<strong>{ownershipType === "user" ? formOwner : formTeam}</strong>). Existing permissions will follow the new assignment.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800">
+              <SecondaryButton onClick={() => setShowReassignConfirmModal(false)}>
+                Cancel
+              </SecondaryButton>
+              <button
+                type="button"
+                onClick={executeSaveVirtualKey}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-2xs"
+              >
+                Confirm Reassignment & Save
+              </button>
             </div>
           </div>
         </div>
