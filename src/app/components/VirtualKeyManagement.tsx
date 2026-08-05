@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { MultiEmailInput } from "./TeamsManagement";
+import VirtualKeySuccessModal from "./VirtualKeySuccessModal";
 import { 
   Plus, 
   Search, 
@@ -347,6 +348,8 @@ export default function VirtualKeyManagement() {
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showResetSpendModal, setShowResetSpendModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdSuccessKey, setCreatedSuccessKey] = useState<{ secretKey: string; alias: string } | null>(null);
 
   // Highlighted key ID after creation
   const [highlightedKeyId, setHighlightedKeyId] = useState<string | null>(null);
@@ -647,10 +650,16 @@ export default function VirtualKeyManagement() {
         setHighlightedKeyId(selectedKey.id);
       } else {
         const newId = `vk-${Date.now()}`;
+        const p1 = Math.random().toString(36).substring(2, 10);
+        const p2 = Math.random().toString(36).substring(2, 10);
+        const p3 = Math.random().toString(36).substring(2, 10);
+        const p4 = Math.random().toString(36).substring(2, 10);
+        const plaintextKey = `sk-gl-${p1}${p2}${p3}${p4}`;
+
         const newKey: VirtualKey = {
           id: newId,
           keyId: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-          secretKeyMasked: `sk-litellm-${Math.random().toString(36).substring(2, 8)}••••••••••••••••••••••••`,
+          secretKeyMasked: `sk-gl-${p1}••••••••••••••••••••••••`,
           alias: formAlias.trim(),
           description: formDescription.trim(),
           owner: ownershipType === "user" ? formOwner : "",
@@ -680,7 +689,10 @@ export default function VirtualKeyManagement() {
         setKeys((prev) => [newKey, ...prev]);
         setHighlightedKeyId(newId);
         setTimeout(() => setHighlightedKeyId(null), 3000);
-        toast.success("Virtual Key created successfully!");
+
+        // Open Virtual Key Creation Success Popup
+        setCreatedSuccessKey({ secretKey: plaintextKey, alias: formAlias.trim() });
+        setShowSuccessModal(true);
       }
 
       setIsGenerating(false);
@@ -690,12 +702,19 @@ export default function VirtualKeyManagement() {
 
   const handleRegenerateKeySubmit = () => {
     if (!selectedKey) return;
+    const p1 = Math.random().toString(36).substring(2, 10);
+    const p2 = Math.random().toString(36).substring(2, 10);
+    const p3 = Math.random().toString(36).substring(2, 10);
+    const p4 = Math.random().toString(36).substring(2, 10);
+    const plaintextKey = `sk-gl-${p1}${p2}${p3}${p4}`;
     const newKeyId = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+
     setKeys((prev) =>
-      prev.map((k) => (k.id === selectedKey.id ? { ...k, keyId: newKeyId, lastUsed: "Just now" } : k))
+      prev.map((k) => (k.id === selectedKey.id ? { ...k, keyId: newKeyId, secretKeyMasked: `sk-gl-${p1}••••••••••••••••••••••••`, lastUsed: "Just now" } : k))
     );
-    toast.success(`Regenerated secret key for "${selectedKey.alias}"!`);
     setShowRegenerateModal(false);
+    setCreatedSuccessKey({ secretKey: plaintextKey, alias: selectedKey.alias });
+    setShowSuccessModal(true);
   };
 
   const handleResetSpendSubmit = () => {
@@ -2995,6 +3014,17 @@ export default function VirtualKeyManagement() {
           </div>
         </div>
       )}
+
+      {/* Virtual Key Creation / Regeneration Success Modal */}
+      <VirtualKeySuccessModal
+        isOpen={showSuccessModal}
+        secretKey={createdSuccessKey?.secretKey || null}
+        keyAlias={createdSuccessKey?.alias}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setCreatedSuccessKey(null);
+        }}
+      />
 
     </div>
   );

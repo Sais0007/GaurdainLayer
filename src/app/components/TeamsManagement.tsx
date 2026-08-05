@@ -78,6 +78,18 @@ import {
   type ColumnConfig
 } from "./hb/listing";
 
+// Helper: Format Date for Display
+const formatDateDisplay = (dateStr: string) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
+};
+
 // --- Team Interfaces ---
 export interface TeamMember {
   id: string;
@@ -580,6 +592,340 @@ function ProviderModelSelector({ assignedProviders, onChange }: ProviderModelSel
   );
 }
 
+// --- Reusable Team Members Selector Component ---
+interface TeamMembersSelectorProps {
+  members: TeamMember[];
+  availableUsers: typeof AVAILABLE_SYSTEM_USERS;
+  onChange: (updatedMembers: TeamMember[]) => void;
+  onInviteUserClick: () => void;
+}
+
+function TeamMembersSelector({
+  members,
+  availableUsers,
+  onChange,
+  onInviteUserClick,
+}: TeamMembersSelectorProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filter available users based on search term (Name, Email, User ID)
+  const filteredUsers = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return availableUsers;
+    return availableUsers.filter(
+      (u) =>
+        u.name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term) ||
+        u.id.toLowerCase().includes(term)
+    );
+  }, [availableUsers, searchTerm]);
+
+  const isUserSelected = (userEmail: string) => {
+    return members.some((m) => m.email.toLowerCase() === userEmail.toLowerCase());
+  };
+
+  const handleToggleUser = (user: typeof AVAILABLE_SYSTEM_USERS[0]) => {
+    if (isUserSelected(user.email)) {
+      const mem = members.find((m) => m.email.toLowerCase() === user.email.toLowerCase());
+      if (mem) setMemberToRemove(mem);
+    } else {
+      const todayDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const newMember: TeamMember = {
+        id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: user.name,
+        email: user.email,
+        userId: user.id,
+        role: "Member", // Default role
+        models: [],
+        budget: 0,
+        currentSpend: 0,
+        status: "Active",
+        lastActive: "Just now",
+        addedDate: todayDate,
+      };
+      onChange([...members, newMember]);
+    }
+  };
+
+  const handleUpdateRole = (memberId: string, newRole: string) => {
+    onChange(
+      members.map((m) => (m.id === memberId ? { ...m, role: newRole as any } : m))
+    );
+  };
+
+  const confirmRemoveMember = () => {
+    if (!memberToRemove) return;
+    onChange(members.filter((m) => m.id !== memberToRemove.id));
+    toast.success(`Removed "${memberToRemove.name}" from team selection.`);
+    setMemberToRemove(null);
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Search & Multi-Select Input Dropdown */}
+      <div className="space-y-1.5 relative" ref={dropdownRef}>
+        <label className="block text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+          Assigned Members
+        </label>
+        
+        <div className="relative">
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onFocus={() => setIsDropdownOpen(true)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setIsDropdownOpen(true);
+              }}
+              placeholder="Search members by name, email, or user ID..."
+              className="w-full h-10 pl-9 pr-8 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-primary-500"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Dropdown Options */}
+          {isDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => {
+                  const selected = isUserSelected(user.email);
+                  return (
+                    <div
+                      key={user.id}
+                      onClick={() => handleToggleUser(user)}
+                      className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                        selected
+                          ? "bg-primary-50/70 dark:bg-primary-950/40 text-primary-900 dark:text-primary-100"
+                          : "hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => {}} // div onClick handles toggle
+                          className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-xs">
+                          {getInitials(user.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold truncate text-neutral-900 dark:text-white flex items-center gap-1.5">
+                            <span>{user.name}</span>
+                            <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
+                              {user.id}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                            {user.email} &bull; <span className="italic">{user.department || user.role}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {selected && (
+                        <span className="text-[10px] font-semibold text-primary-600 dark:text-primary-400 bg-primary-100 dark:bg-primary-900/50 px-2 py-0.5 rounded-full shrink-0">
+                          Selected
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-4 text-center space-y-2">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    No organization members match "{searchTerm}".
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onInviteUserClick();
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ Invite New User</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Selected Members Chips / Removable Cards */}
+      {members.length > 0 ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+              Selected Team Members ({members.length})
+            </span>
+            <span className="text-[11px] text-neutral-400">
+              Assign team roles below
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1 custom-scrollbar">
+            {members.map((mem) => (
+              <div
+                key={mem.id}
+                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl gap-2 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-xs">
+                    {getInitials(mem.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs text-neutral-900 dark:text-white truncate">
+                      {mem.name}
+                    </p>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
+                      {mem.email}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Team Role Assignment Selector */}
+                  <select
+                    value={mem.role || "Member"}
+                    onChange={(e) => handleUpdateRole(mem.id, e.target.value)}
+                    className="h-7 px-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-lg text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-primary-500 cursor-pointer"
+                    title="Assign Team Role"
+                  >
+                    <option value="Member">Member</option>
+                    <option value="Team Admin">Team Admin</option>
+                  </select>
+
+                  {/* Remove Button */}
+                  <button
+                    type="button"
+                    onClick={() => setMemberToRemove(mem)}
+                    className="p-1 text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
+                    title="Remove member"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-neutral-50 dark:bg-neutral-950 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-xl text-center space-y-2">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            No organization members are available for this team yet.
+          </p>
+          <button
+            type="button"
+            onClick={onInviteUserClick}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>+ Invite First User</span>
+          </button>
+        </div>
+      )}
+
+      {/* Action Button: + Invite New User */}
+      <div className="pt-1 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onInviteUserClick}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 transition-colors cursor-pointer"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>+ Invite New User</span>
+        </button>
+        <span className="text-[11px] text-neutral-400">
+          User will be automatically invited & assigned
+        </span>
+      </div>
+
+      {/* MEMBER REMOVAL CONFIRMATION DIALOG */}
+      {memberToRemove && (
+        <div 
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4 animate-scaleUp text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
+                  Remove {memberToRemove.name}?
+                </h4>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Confirm team membership removal
+                </p>
+              </div>
+            </div>
+
+            <p className="text-neutral-600 dark:text-neutral-300 leading-relaxed">
+              Remove <strong className="text-neutral-900 dark:text-white">{memberToRemove.name}</strong> from this team? This only removes their association with this team and will not delete their user account.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setMemberToRemove(null)}
+                className="px-3.5 py-2 border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg font-medium transition-colors cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmRemoveMember}
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-lg font-medium transition-colors shadow-xs cursor-pointer text-xs"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TeamsManagement() {
   const [teams, setTeams] = useState<TeamItem[]>(mockTeamsData);
   // View State: "list" | "detail" | "create" | "edit" | "add-user"
@@ -650,6 +996,54 @@ export default function TeamsManagement() {
   const [formRpmLimit, setFormRpmLimit] = useState<number>(5000);
   const [formAlertEmails, setFormAlertEmails] = useState<string[]>(["john.doe@company.com"]);
 
+  // --- Team Members Assignment State ---
+  const [availableSystemUsersList, setAvailableSystemUsersList] = useState(AVAILABLE_SYSTEM_USERS);
+  const [formMembersList, setFormMembersList] = useState<TeamMember[]>([]);
+
+  // Inline Invite User modal state in Team form
+  const [showInviteModalInTeamForm, setShowInviteModalInTeamForm] = useState(false);
+  const [newUserNameInForm, setNewUserNameInForm] = useState("");
+  const [newUserEmailInForm, setNewUserEmailInForm] = useState("");
+  const [newUserRoleInForm, setNewUserRoleInForm] = useState("Member");
+
+  const handleInviteUserSubmitInForm = () => {
+    if (!newUserNameInForm.trim() || !newUserEmailInForm.trim()) return;
+
+    const newUserId = `usr-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newSysUser = {
+      id: newUserId,
+      name: newUserNameInForm.trim(),
+      email: newUserEmailInForm.trim(),
+      role: newUserRoleInForm,
+      department: "Engineering",
+    };
+
+    setAvailableSystemUsersList((prev) => [newSysUser, ...prev]);
+
+    const todayDate = formatDateDisplay(new Date().toISOString().split("T")[0]);
+    const newMember: TeamMember = {
+      id: `m-${Date.now()}`,
+      name: newUserNameInForm.trim(),
+      email: newUserEmailInForm.trim(),
+      userId: newUserId,
+      role: newUserRoleInForm as any,
+      models: [],
+      budget: 0,
+      currentSpend: 0,
+      status: "Active",
+      lastActive: "Just now",
+      addedDate: todayDate,
+    };
+
+    setFormMembersList((prev) => [...prev, newMember]);
+    toast.success(`User "${newUserNameInForm.trim()}" invited and assigned to team!`);
+
+    setShowInviteModalInTeamForm(false);
+    setNewUserNameInForm("");
+    setNewUserEmailInForm("");
+    setNewUserRoleInForm("Member");
+  };
+
   // --- Add User Dedicated Screen State ---
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -666,6 +1060,11 @@ export default function TeamsManagement() {
     setFormTpmLimit(500000);
     setFormRpmLimit(5000);
     setFormAlertEmails(["john.doe@company.com"]);
+
+    const todayDate = formatDateDisplay(new Date().toISOString().split("T")[0]);
+    setFormMembersList([
+      { id: "m-101", name: "John Doe", email: "john.doe@company.com", userId: "usr-101", role: "Team Admin", models: ["GPT-4o"], budget: 5000, currentSpend: 0, status: "Active", lastActive: "Just now", addedDate: todayDate }
+    ]);
     setViewState("create");
   };
 
@@ -683,6 +1082,7 @@ export default function TeamsManagement() {
     setFormTpmLimit(team.tpmLimit);
     setFormRpmLimit(team.rpmLimit);
     setFormAlertEmails(team.alertEmails || ["john.doe@company.com"]);
+    setFormMembersList(team.membersList || []);
     setViewState("edit");
   };
 
@@ -714,11 +1114,13 @@ export default function TeamsManagement() {
         allowedModels: allowed,
         updatedDate: formattedDate,
         alertEmails: formAlertEmails,
+        membersList: formMembersList,
+        membersCount: formMembersList.length,
       };
 
       setTeams((prev) => prev.map((t) => (t.id === selectedTeam.id ? updatedItem : t)));
       setSelectedTeam(updatedItem);
-      toast.success(`Team "${updatedItem.name}" updated successfully.`);
+      toast.success(`Team "${updatedItem.name}" updated successfully with ${formMembersList.length} member(s).`);
     } else {
       const newTeam: TeamItem = {
         id: `team-${Date.now()}`,
@@ -727,7 +1129,7 @@ export default function TeamsManagement() {
         description: formDescription.trim(),
         owner: "John Doe",
         ownerEmail: "john.doe@company.com",
-        membersCount: 1,
+        membersCount: formMembersList.length,
         virtualKeysCount: 0,
         accessGroupsCount: 0,
         currentSpend: 0,
@@ -742,9 +1144,7 @@ export default function TeamsManagement() {
         updatedDate: formattedDate,
         assignedProviders: formAssignedProviders,
         allowedModels: allowed,
-        membersList: [
-          { id: "m-101", name: "John Doe", email: "john.doe@company.com", userId: "usr-101", role: "Team Admin", models: allowed, budget: formMaxBudget, currentSpend: 0, status: "Active", lastActive: "Just now", addedDate: formattedDate }
-        ],
+        membersList: formMembersList,
         keysList: [],
         policies: ["Zero Retention"],
         guardrails: ["Content Safety"],
@@ -757,7 +1157,7 @@ export default function TeamsManagement() {
       };
 
       setTeams((prev) => [newTeam, ...prev]);
-      toast.success(`Team "${newTeam.name}" created successfully.`);
+      toast.success(`Team "${newTeam.name}" created successfully with ${formMembersList.length} member(s).`);
     }
 
     setViewState("list");
@@ -1152,6 +1552,24 @@ export default function TeamsManagement() {
               <ProviderModelSelector
                 assignedProviders={formAssignedProviders}
                 onChange={(updated) => setFormAssignedProviders(updated)}
+              />
+            </div>
+
+            {/* 3. Team Members Assignment */}
+            <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">Team Members</h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Assign organization members who should belong to this team.</p>
+                </div>
+              </div>
+
+              <TeamMembersSelector
+                members={formMembersList}
+                availableUsers={availableSystemUsersList}
+                onChange={setFormMembersList}
+                onInviteUserClick={() => setShowInviteModalInTeamForm(true)}
               />
             </div>
 
@@ -1741,6 +2159,90 @@ export default function TeamsManagement() {
               >
                 Delete Team
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Invite User Modal Overlay in Team Form */}
+      {showInviteModalInTeamForm && (
+        <div 
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 my-auto animate-scaleUp text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Invite & Add User</h3>
+                  <p className="text-[11px] text-neutral-500">Create user and auto-assign to this team.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInviteModalInTeamForm(false)}
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newUserNameInForm}
+                  onChange={(e) => setNewUserNameInForm(e.target.value)}
+                  placeholder="e.g. Sarah Lead"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={newUserEmailInForm}
+                  onChange={(e) => setNewUserEmailInForm(e.target.value)}
+                  placeholder="e.g. sarah.lead@company.com"
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-semibold text-neutral-800 dark:text-neutral-200">Team Role</label>
+                <select
+                  value={newUserRoleInForm}
+                  onChange={(e) => setNewUserRoleInForm(e.target.value)}
+                  className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg text-xs font-medium text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500 cursor-pointer"
+                >
+                  <option value="Member">Member</option>
+                  <option value="Team Admin">Team Admin</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+              <SecondaryButton onClick={() => setShowInviteModalInTeamForm(false)}>
+                Cancel
+              </SecondaryButton>
+              <PrimaryButton
+                disabled={!newUserNameInForm.trim() || !newUserEmailInForm.trim()}
+                onClick={handleInviteUserSubmitInForm}
+              >
+                Invite & Assign User
+              </PrimaryButton>
             </div>
           </div>
         </div>

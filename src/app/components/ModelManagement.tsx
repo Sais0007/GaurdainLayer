@@ -34,7 +34,9 @@ import {
   KeyRound,
   BarChart3,
   EyeOff,
-  Eye
+  Eye,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -63,9 +65,10 @@ import { getSharedCredentials, setSharedCredentials, type CredentialItem } from 
 export interface ModelItem {
   id: string;
   modelId: string; // Unique alphanumeric Model ID (e.g. mdl-9F3K28A)
-  provider: "OpenAI" | "Anthropic" | "Azure AI" | "DeepSeek" | "Ollama";
-  name: string; // Provider technical model name (e.g. GPT-4o-2026-08)
+  provider: "OpenAI" | "Anthropic" | "Azure AI" | "DeepSeek" | "Ollama" | string;
+  name: string; // Provider technical model name (e.g. GPT-4o-2026-08, claude-4-sonnet)
   alias: string; // User-friendly business name (e.g. GPT-4o Mini)
+  isCustom?: boolean; // Flag indicating if model is custom/user-added
   createdBy: string;
   createdOn: string;
   inputCost: number;
@@ -268,10 +271,96 @@ export default function ModelManagement() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingModel, setIsSavingModel] = useState(false);
 
+  // Custom Model Configuration State
+  const [customModelsMap, setCustomModelsMap] = useState<Record<string, { id: string; name: string; isCustom: boolean; inCost?: number; outCost?: number }[]>>({});
+  const [customModelInput, setCustomModelInput] = useState("");
+  const [customModelError, setCustomModelError] = useState<string | null>(null);
+  const [isAddCustomExpanded, setIsAddCustomExpanded] = useState(false);
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState("");
+
+  // Auto-generate default alias from custom model name (e.g. claude-4-sonnet -> Claude 4 Sonnet)
+  const generateDefaultAlias = (modelName: string): string => {
+    if (!modelName) return "";
+    return modelName
+      .split(/[-_.]/)
+      .filter(Boolean)
+      .map((word) => {
+        const lower = word.toLowerCase();
+        if (lower === "gpt") return "GPT";
+        if (lower === "api") return "API";
+        if (lower === "ai") return "AI";
+        if (lower === "llm") return "LLM";
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
+      .join(" ");
+  };
+
+  // Validate custom model name
+  const validateCustomModelName = (name: string, selectedIds: string[], presetModels: string[]): string | null => {
+    const trimmed = name.trim();
+    if (!trimmed) return "Custom model name cannot be empty.";
+    if (trimmed.length > 100) return "Model name cannot exceed 100 characters.";
+    const validRegex = /^[a-zA-Z0-9\-_.:/]+$/;
+    if (!validRegex.test(trimmed)) {
+      return "Invalid characters. Only letters, numbers, -, _, ., :, / are allowed.";
+    }
+    const isDuplicatePreset = presetModels.some((m) => m.toLowerCase() === trimmed.toLowerCase());
+    const isDuplicateSelected = selectedIds.some((m) => m.toLowerCase() === trimmed.toLowerCase());
+    if (isDuplicatePreset || isDuplicateSelected) {
+      return "This model name is already added or exists in the preset catalog.";
+    }
+    return null;
+  };
+
+  const handleAddCustomModel = (nameToAdd?: string) => {
+    const targetName = (nameToAdd || customModelInput).trim();
+    const presets = (providerPresetModels[formProvider] || []).map((p) => p.id);
+    const err = validateCustomModelName(targetName, selectedModelIds, presets);
+    if (err) {
+      setCustomModelError(err);
+      return;
+    }
+
+    setCustomModelError(null);
+    const customItem = {
+      id: targetName,
+      name: targetName,
+      isCustom: true,
+      inCost: 0.0025,
+      outCost: 0.010,
+    };
+
+    setCustomModelsMap((prev) => ({
+      ...prev,
+      [formProvider]: [...(prev[formProvider] || []).filter((c) => c.id !== targetName), customItem],
+    }));
+
+    if (!selectedModelIds.includes(targetName)) {
+      setSelectedModelIds((prev) => [...prev, targetName]);
+    }
+
+    const defaultAlias = generateDefaultAlias(targetName);
+    setFormModelAliases((prev) => ({ ...prev, [targetName]: defaultAlias }));
+
+    setCustomModelInput("");
+    setCatalogSearchQuery("");
+    toast.success(`Added custom model "${targetName}"!`);
+  };
+
+  const handleRemoveCustomModel = (mId: string) => {
+    setSelectedModelIds((prev) => prev.filter((id) => id !== mId));
+    setCustomModelsMap((prev) => ({
+      ...prev,
+      [formProvider]: (prev[formProvider] || []).filter((c) => c.id !== mId),
+    }));
+  };
+
   const getModelName = (mId: string) => {
     const presets = providerPresetModels[formProvider] || [];
     const match = presets.find((p) => p.id === mId);
-    return match ? match.name : mId;
+    if (match) return match.name;
+    const customMatch = (customModelsMap[formProvider] || []).find((c) => c.id === mId);
+    return customMatch ? customMatch.name : mId;
   };
 
   // Dynamic credentials from Credentials Management store
@@ -437,6 +526,16 @@ export default function ModelManagement() {
     setFormApiKey(model.apiKey || "");
     setTestStatus("none");
     setTestConnectionMessage("");
+
+    if (model.isCustom) {
+      setCustomModelsMap((prev) => ({
+        ...prev,
+        [model.provider]: [
+          ...(prev[model.provider] || []).filter((c) => c.id !== model.name),
+          { id: model.name, name: model.name, isCustom: true },
+        ],
+      }));
+    }
     setShowAddModelModal(true);
   };
 
@@ -444,10 +543,19 @@ export default function ModelManagement() {
   const handleFormProviderChange = (prov: ModelItem["provider"]) => {
     setFormProvider(prov);
     const presets = providerPresetModels[prov] || [];
+    const customs = customModelsMap[prov] || [];
     if (presets.length > 0) {
       setSelectedModelIds([presets[0].id]);
       setFormModelAlias(presets[0].name);
       setFormModelAliases({ [presets[0].id]: presets[0].name });
+    } else if (customs.length > 0) {
+      setSelectedModelIds([customs[0].id]);
+      setFormModelAlias(generateDefaultAlias(customs[0].name));
+      setFormModelAliases({ [customs[0].id]: generateDefaultAlias(customs[0].name) });
+    } else {
+      setSelectedModelIds([]);
+      setFormModelAlias("");
+      setFormModelAliases({});
     }
   };
 
@@ -463,7 +571,7 @@ export default function ModelManagement() {
       if (!formModelAliases[mId]) {
         const presets = providerPresetModels[formProvider] || [];
         const match = presets.find((p) => p.id === mId);
-        const name = match ? match.name : mId;
+        const name = match ? match.name : generateDefaultAlias(mId);
         setFormModelAliases((prev) => ({ ...prev, [mId]: name }));
       }
     }
@@ -533,6 +641,7 @@ export default function ModelManagement() {
       if (isEditMode && editingModel) {
         const targetModel = selectedModelIds[0] || editingModel.name;
         const aliasToSave = (formModelAliases[targetModel] || formModelAlias || editingModel.alias).trim();
+        const isCustomModel = Boolean(editingModel.isCustom || (customModelsMap[formProvider] || []).some((c) => c.id === targetModel));
         setModels((prev) =>
           prev.map((item) =>
             item.id === editingModel.id
@@ -541,6 +650,7 @@ export default function ModelManagement() {
                   provider: formProvider,
                   name: targetModel,
                   alias: aliasToSave,
+                  isCustom: isCustomModel,
                   credentialSource: formCredentialSource,
                   credentialId: formCredentialId,
                   apiBaseUrl: formApiBaseUrl,
@@ -553,20 +663,24 @@ export default function ModelManagement() {
       } else {
         // Create models for selectedModelIds
         const presets = providerPresetModels[formProvider] || [];
+        const customList = customModelsMap[formProvider] || [];
         const newItems: ModelItem[] = selectedModelIds.map((mId, idx) => {
           const match = presets.find((p) => p.id === mId);
+          const isCustomModel = Boolean(customList.some((c) => c.id === mId) || !match);
           const randHex = Math.random().toString(36).substring(2, 8).toUpperCase();
-          const modelAlias = (formModelAliases[mId] || (match ? match.name : mId)).trim();
+          const defaultAliasName = generateDefaultAlias(mId);
+          const modelAlias = (formModelAliases[mId] || (match ? match.name : defaultAliasName)).trim();
           return {
             id: `mod-${Date.now()}-${idx}`,
             modelId: `mdl-${randHex}`,
             provider: formProvider,
             name: mId,
             alias: modelAlias,
+            isCustom: isCustomModel,
             createdBy: "John Doe",
             createdOn: todayDate,
-            inputCost: match ? match.inCost : 0.0015,
-            outputCost: match ? match.outCost : 0.0060,
+            inputCost: match ? match.inCost : 0.0025,
+            outputCost: match ? match.outCost : 0.010,
             status: "Active",
             healthStatus: "Healthy",
             lastSuccess: nowStr,
@@ -916,7 +1030,14 @@ export default function ModelManagement() {
                     {/* 2. Model Name */}
                     {visibleColumns.name && (
                       <td className="p-4 font-medium text-neutral-900 dark:text-white hover:text-primary-600 transition-colors">
-                        {item.name}
+                        <div className="flex items-center gap-1.5">
+                          <span>{item.name}</span>
+                          {item.isCustom && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                              Custom
+                            </span>
+                          )}
+                        </div>
                       </td>
                     )}
 
@@ -1180,34 +1301,198 @@ export default function ModelManagement() {
 
             {/* Checkable Multiple Models Selection */}
             <FormField className="pt-2">
-              <FormLabel required>Select Available Models</FormLabel>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                {(providerPresetModels[formProvider] || []).map((m) => {
-                  const isChecked = selectedModelIds.includes(m.id);
+              <div className="flex items-center justify-between">
+                <FormLabel required>Select Available Models</FormLabel>
+                <span className="text-[11px] text-neutral-400">
+                  {selectedModelIds.length} model(s) selected
+                </span>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative my-2">
+                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={catalogSearchQuery}
+                  onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                  placeholder={`Search ${formProvider} catalog or custom models...`}
+                  className="w-full h-8 pl-8 pr-7 bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-primary-500"
+                />
+                {catalogSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalogSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Grid of Preset Catalog Models + Custom Models */}
+              {(() => {
+                const presets = providerPresetModels[formProvider] || [];
+                const customs = customModelsMap[formProvider] || [];
+
+                const combinedList = [
+                  ...presets.map((p) => ({ ...p, isCustom: false })),
+                  ...customs.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    inCost: c.inCost || 0.0025,
+                    outCost: c.outCost || 0.01,
+                    isCustom: true,
+                  })),
+                ];
+
+                const searchLower = catalogSearchQuery.trim().toLowerCase();
+                const filtered = searchLower
+                  ? combinedList.filter((m) => m.name.toLowerCase().includes(searchLower))
+                  : combinedList;
+
+                if (filtered.length === 0 && searchLower) {
                   return (
-                    <label
-                      key={m.id}
-                      onClick={() => handleToggleModelSelection(m.id)}
-                      className={`p-2.5 rounded-lg border text-xs font-medium flex items-center justify-between cursor-pointer transition-all ${
-                        isChecked
-                          ? "bg-primary-50 dark:bg-primary-950/60 border-primary-400 text-primary-900 dark:text-primary-100 font-semibold"
-                          : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300"
-                      }`}
-                    >
-                      <div className="truncate pr-2">
-                        <span className="block font-semibold">{m.name}</span>
-                        <span className="text-[10px] text-neutral-400 font-mono">
-                          In: ${m.inCost.toFixed(5)} • Out: ${m.outCost.toFixed(5)}
-                        </span>
-                      </div>
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
-                        isChecked ? "bg-primary-600 border-primary-600 text-white" : "border-neutral-300"
-                      }`}>
-                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                    </label>
+                    <div className="p-4 bg-neutral-50 dark:bg-neutral-900 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-xl text-center space-y-2 my-2">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        No matching models found in the {formProvider} catalog.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomModel(catalogSearchQuery.trim())}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add "{catalogSearchQuery.trim()}" as a Custom Model</span>
+                      </button>
+                    </div>
                   );
-                })}
+                }
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-56 overflow-y-auto custom-scrollbar">
+                    {filtered.map((m) => {
+                      const isChecked = selectedModelIds.includes(m.id);
+                      return (
+                        <div
+                          key={m.id}
+                          className={`p-2.5 rounded-lg border text-xs font-medium flex items-center justify-between transition-all ${
+                            isChecked
+                              ? "bg-primary-50 dark:bg-primary-950/60 border-primary-400 text-primary-900 dark:text-primary-100 font-semibold"
+                              : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300"
+                          }`}
+                        >
+                          <div
+                            onClick={() => handleToggleModelSelection(m.id)}
+                            className="flex-1 truncate pr-2 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-semibold truncate">{m.name}</span>
+                              {m.isCustom && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
+                                  Custom
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-neutral-400 font-mono block">
+                              In: ${m.inCost.toFixed(5)} &bull; Out: ${m.outCost.toFixed(5)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {m.isCustom && isChecked && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveCustomModel(m.id);
+                                }}
+                                className="p-0.5 text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
+                                title="Remove custom model"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <div
+                              onClick={() => handleToggleModelSelection(m.id)}
+                              className={`w-4 h-4 rounded flex items-center justify-center border transition-colors cursor-pointer ${
+                                isChecked ? "bg-primary-600 border-primary-600 text-white" : "border-neutral-300"
+                              }`}
+                            >
+                              {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* Expandable Add Custom Model Section */}
+              <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-800 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCustomExpanded(!isAddCustomExpanded)}
+                  className="flex items-center justify-between w-full text-left text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:text-primary-600 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>Add Custom Model</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-normal border border-purple-200 dark:border-purple-800">
+                      Unlisted / New Release
+                    </span>
+                  </span>
+                  {isAddCustomExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {isAddCustomExpanded && (
+                  <div className="p-3 bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-xl space-y-3 animate-fadeIn text-xs">
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Configure a model that is not currently available in the provider's predefined model list.
+                    </p>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="custom-model-input-field" className="block font-semibold text-neutral-800 dark:text-neutral-200">
+                        Custom Model Name
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="custom-model-input-field"
+                          type="text"
+                          value={customModelInput}
+                          onChange={(e) => {
+                            setCustomModelInput(e.target.value);
+                            setCustomModelError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddCustomModel();
+                            }
+                          }}
+                          placeholder="Enter custom model name (e.g. claude-4-sonnet, gpt-5)..."
+                          className="flex-1 h-9 px-3 bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-700 rounded-lg font-mono text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-primary-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddCustomModel()}
+                          className="px-3 py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-lg font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Add Custom Model</span>
+                        </button>
+                      </div>
+                      {customModelError && (
+                        <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium pt-0.5">
+                          {customModelError}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-neutral-400">
+                        Allowed: letters, numbers, -, _, ., :, / (Max 100 characters)
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </FormField>
           </FormSection>
